@@ -1,0 +1,411 @@
+"""Main entry point — orchestrates all Talk modules together."""
+
+from __future__ import annotations
+
+import copy
+import logging
+import threading
+import time
+
+from talk.audio import AudioRecorder, normalize_audio
+from talk.clipboard import grab_selected_text, inject_text
+from talk.config import AppConfig, load_config, save_config
+from talk.hotkey import HotkeyListener
+from talk.llm import LLMClient
+from talk.stt import STTApiEngine, STTEngine
+from talk.tray import TrayApp
+
+logger = logging.getLogger(__name__)
+
+
+class TalkApp:
+    """Main application orchestrator.
+
+    Wires together the hotkey listener, audio recorder, STT engine, LLM
+    client, and system tray icon into a push-to-talk pipeline.
+    """
+
+    def __init__(self) -> None:
+        logger.info("Loading configuration...")
+        self._config = load_config()
+        # Deep copy so settings-change detection works (the dialog mutates in-place)
+        self._prev_config = copy.deepcopy(self._config)
+
+        # -- Interaction state (written in on_press, read in pipeline) --------
+        self._mode: str = "insert"  # "polish" or "insert"
+        self._selected_text: str | None = None
+        self._original_clipboard: str | None = None
+
+        # -- Pipeline lock: only one interaction at a time --------------------
+        self._pipeline_lock = threading.Lock()
+        # True only when _on_hotkey_press succeeded (lock acquired)
+        self._press_active = False
+        # Signalled once the press-setup thread finishes (recording started or error)
+        self._recording_started = threading.Event()
+        self._recording_started.set()  # initially "done"
+
+        # -- Initialise subsystems -------------------------------------------
+        logger.info("Initialising audio recorder...")
+        self._recorder = self._init_recorder()
+
+        logger.info("Initialising STT engine (this may take a moment)...")
+        self._stt = self._init_stt()
+
+        logger.info("Initialising LLM client...")
+        self._llm: LLMClient | None = self._init_llm_client()
+
+        logger.info("Initialising hotkey listener...")
+        self._hotkey = HotkeyListener(
+            self._config.hotkey.trigger,
+            on_press=self._on_hotkey_press,
+            on_release=self._on_hotkey_release,
+        )
+
+        logger.info("Initialising system tray...")
+        self._tray = TrayApp(
+            config=self._config,
+            on_settings_changed=self._on_settings_changed,
+            on_quit=self._on_quit,
+        )
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def run(self) -> None:
+        """Start the application.
+
+        Starts the hotkey listener, then runs the system-tray icon which
+        blocks until the user quits.
+        """
+        self._hotkey.start()
+        logger.info("Talk is ready.  Hold %s to speak.", self._config.hotkey.trigger)
+        self._tray.update_status("Ready")
+
+        # tray.run() blocks until the user selects Quit.
+        self._tray.run()
+
+    # ------------------------------------------------------------------
+    # Hotkey callbacks
+    # ------------------------------------------------------------------
+
+    def _on_hotkey_press(self) -> None:
+        """Called when the push-to-talk hotkey is pressed.
+
+        IMPORTANT: This runs inside the pynput low-level keyboard hook
+        callback.  On Windows the hook has a strict timeout (~300 ms).
+        If we block too long here, Windows removes the hook and the
+        hotkey listener dies silently.  Therefore we only acquire the
+        pipeline lock and immediately spawn a worker thread for the
+        heavy clipboard-probe + recording-start work.
+        """
+        if not self._pipeline_lock.acquire(blocking=False):
+            logger.warning("Pipeline already running — ignoring hotkey press")
+            return
+
+        self._press_active = True
+        self._recording_started.clear()
+        threading.Thread(
+            target=self._start_recording, name="talk-rec-start", daemon=True,
+        ).start()
+
+    def _on_hotkey_release(self) -> None:
+        """Called when the push-to-talk hotkey is released.
+
+        Spawns a background thread to run the rest of the pipeline so that
+        the hotkey listener is not blocked.
+        """
+        if not self._press_active:
+            return
+        self._press_active = False
+        threading.Thread(
+            target=self._process_pipeline, name="talk-pipeline", daemon=True,
+        ).start()
+
+    # ------------------------------------------------------------------
+    # Recording start (runs on a worker thread, NOT the hook thread)
+    # ------------------------------------------------------------------
+
+    def _start_recording(self) -> None:
+        """Probe the clipboard and start the microphone.
+
+        This is spawned by :meth:`_on_hotkey_press` on a short-lived worker
+        thread so the keyboard hook callback returns immediately.  The
+        ``_recording_started`` event is set in the ``finally`` block to let
+        the pipeline thread know it can proceed.
+        """
+        try:
+            self._tray.update_status("Listening...")
+
+            # Grab selected text to determine the interaction mode.
+            logger.info("Grabbing selected text...")
+            self._selected_text, self._original_clipboard = grab_selected_text()
+
+            if self._selected_text:
+                self._mode = "polish"
+                logger.info("Mode: polish (selected %d chars)", len(self._selected_text))
+            else:
+                self._mode = "insert"
+                logger.info("Mode: insert (no selection detected)")
+
+            # Start recording.
+            logger.info("Starting audio recording...")
+            self._recorder.start()
+            self._tray.update_status("Recording...")
+        except Exception:
+            logger.exception("Error starting recording")
+            self._tray.update_status("Error")
+        finally:
+            # Always signal so the pipeline thread never hangs.
+            self._recording_started.set()
+
+    # ------------------------------------------------------------------
+    # Pipeline
+    # ------------------------------------------------------------------
+
+    def _process_pipeline(self) -> None:
+        """Run the full STT -> LLM -> inject pipeline in a background thread."""
+        try:
+            # Wait for the recording-start thread to finish its work.
+            self._recording_started.wait(timeout=10.0)
+
+            if not self._recorder.is_recording:
+                logger.warning("Recording not active — aborting pipeline")
+                self._tray.update_status("Ready")
+                return
+
+            # 1. Stop recording and retrieve audio.
+            logger.info("Stopping audio recording...")
+            audio = self._recorder.stop()
+
+            if audio.size == 0:
+                logger.warning("Empty audio buffer — aborting pipeline")
+                self._tray.update_status("Ready")
+                return
+
+            # 2. Normalize audio (amplify whispered speech).
+            self._tray.update_status("Transcribing...")
+            logger.info("Normalising audio (gain=%.1f)...", self._config.audio.gain_boost)
+            audio = normalize_audio(audio, self._config.audio.gain_boost)
+
+            # 3. Transcribe.
+            logger.info("Transcribing audio...")
+            text = self._stt.transcribe(audio)
+            text = text.strip()
+
+            if not text:
+                logger.warning("Empty transcription — aborting pipeline")
+                self._tray.update_status("Ready")
+                return
+
+            logger.info("Transcription: %s", text)
+
+            # 4. LLM processing (or raw passthrough if LLM is unavailable).
+            self._tray.update_status("Processing...")
+            result = self._run_llm(text)
+
+            # 5. Inject result into the active application.
+            logger.info("Injecting result text (%d chars)...", len(result))
+            inject_text(result, self._original_clipboard)
+
+            self._tray.update_status("Ready")
+            logger.info("Pipeline complete")
+
+        except Exception:
+            logger.exception("Pipeline error")
+            self._tray.update_status("Error")
+            # Briefly show the error status, then revert to Ready.
+            time.sleep(2)
+            self._tray.update_status("Ready")
+        finally:
+            self._pipeline_lock.release()
+
+    def _run_llm(self, transcribed_text: str) -> str:
+        """Send transcribed text through the LLM, falling back to raw text."""
+        if self._llm is None:
+            logger.warning("LLM not configured — using raw transcription")
+            return transcribed_text
+
+        try:
+            if self._mode == "polish":
+                logger.info("Polishing selected text with LLM...")
+                return self._llm.polish(self._selected_text or "", transcribed_text)
+            else:
+                logger.info("Inserting text via LLM...")
+                return self._llm.insert(transcribed_text)
+        except Exception:
+            logger.exception("LLM request failed — falling back to raw transcription")
+            return transcribed_text
+
+    # ------------------------------------------------------------------
+    # Settings hot-reload
+    # ------------------------------------------------------------------
+
+    def _on_settings_changed(self, new_config: AppConfig) -> None:
+        """Handle settings changes pushed from the tray settings dialog."""
+        old = self._prev_config
+        self._config = new_config
+        self._prev_config = copy.deepcopy(new_config)
+
+        logger.info("Saving updated configuration...")
+        save_config(new_config)
+
+        # --- Hotkey ---
+        if new_config.hotkey.trigger != old.hotkey.trigger:
+            logger.info(
+                "Hotkey changed from %r to %r — restarting listener",
+                old.hotkey.trigger,
+                new_config.hotkey.trigger,
+            )
+            self._hotkey.stop()
+            self._hotkey = HotkeyListener(
+                new_config.hotkey.trigger,
+                on_press=self._on_hotkey_press,
+                on_release=self._on_hotkey_release,
+            )
+            self._hotkey.start()
+
+        # --- Audio recorder ---
+        if (
+            new_config.audio.sample_rate != old.audio.sample_rate
+            or new_config.audio.device != old.audio.device
+        ):
+            logger.info("Audio settings changed — reinitialising recorder")
+            self._recorder = self._init_recorder()
+
+        # --- STT engine ---
+        stt_changed = (
+            new_config.stt.backend != old.stt.backend
+            or new_config.stt.model_size != old.stt.model_size
+            or new_config.stt.device != old.stt.device
+            or new_config.stt.compute_type != old.stt.compute_type
+            or new_config.stt.api_base_url != old.stt.api_base_url
+            or new_config.stt.api_key != old.stt.api_key
+            or new_config.stt.api_model != old.stt.api_model
+        )
+        if stt_changed:
+            logger.info("STT settings changed — reinitialising engine...")
+            old_stt = self._stt
+            self._stt = self._init_stt()
+            if isinstance(old_stt, STTApiEngine):
+                old_stt.close()
+
+        # --- LLM client ---
+        llm_changed = (
+            new_config.llm.base_url != old.llm.base_url
+            or new_config.llm.api_key != old.llm.api_key
+            or new_config.llm.model != old.llm.model
+            or new_config.llm.temperature != old.llm.temperature
+            or new_config.llm.max_tokens != old.llm.max_tokens
+            or new_config.llm.prompts.polish != old.llm.prompts.polish
+            or new_config.llm.prompts.insert != old.llm.prompts.insert
+        )
+        if llm_changed:
+            logger.info("LLM settings changed — reinitialising client")
+            if self._llm is not None:
+                self._llm.close()
+            self._llm = self._init_llm_client()
+
+        logger.info("Settings update complete")
+
+    # ------------------------------------------------------------------
+    # Quit
+    # ------------------------------------------------------------------
+
+    def _on_quit(self) -> None:
+        """Handle the Quit action from the tray menu."""
+        logger.info("Shutting down...")
+        self._hotkey.stop()
+        if self._llm is not None:
+            self._llm.close()
+        if isinstance(self._stt, STTApiEngine):
+            self._stt.close()
+        self._tray.stop()
+        logger.info("Goodbye.")
+
+    # ------------------------------------------------------------------
+    # Module initialisation helpers
+    # ------------------------------------------------------------------
+
+    def _init_recorder(self) -> AudioRecorder:
+        """Create an AudioRecorder from the current config."""
+        device = self._config.audio.device or None  # "" -> None (system default)
+        return AudioRecorder(
+            sample_rate=self._config.audio.sample_rate,
+            device=device,
+        )
+
+    def _init_stt(self) -> STTEngine | STTApiEngine:
+        """Create an STT engine from the current config."""
+        cfg = self._config.stt
+
+        if cfg.backend == "api" and cfg.api_base_url and cfg.api_key:
+            logger.info("Using API STT backend (%s)", cfg.api_model)
+            return STTApiEngine(
+                base_url=cfg.api_base_url,
+                api_key=cfg.api_key,
+                model=cfg.api_model,
+                language=cfg.language,
+                sample_rate=self._config.audio.sample_rate,
+            )
+
+        logger.info("Using local STT backend (model=%s)", cfg.model_size)
+        return STTEngine(
+            model_size=cfg.model_size,
+            device=cfg.device,
+            compute_type=cfg.compute_type,
+            language=cfg.language,
+            beam_size=cfg.beam_size,
+            vad_filter=cfg.vad_filter,
+            vad_threshold=cfg.vad_threshold,
+        )
+
+    def _init_llm_client(self) -> LLMClient | None:
+        """Create an LLM client from config.
+
+        Returns ``None`` if the LLM is not fully configured (missing
+        base_url, api_key, or model), in which case pipeline steps that
+        require the LLM will fall back to raw transcription output.
+        """
+        cfg = self._config.llm
+
+        if not cfg.base_url or not cfg.api_key or not cfg.model:
+            logger.warning(
+                "LLM not fully configured (base_url=%r, api_key=%s, model=%r) "
+                "— LLM processing will be skipped",
+                cfg.base_url,
+                "***" if cfg.api_key else "(empty)",
+                cfg.model,
+            )
+            return None
+
+        return LLMClient(
+            base_url=cfg.base_url,
+            api_key=cfg.api_key,
+            model=cfg.model,
+            temperature=cfg.temperature,
+            max_tokens=cfg.max_tokens,
+            prompts={
+                "polish": cfg.prompts.polish,
+                "insert": cfg.prompts.insert,
+            },
+        )
+
+
+# ======================================================================
+# Entry point
+# ======================================================================
+
+
+def main() -> None:
+    """Entry point for the Talk application."""
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+    )
+    app = TalkApp()
+    app.run()
+
+
+if __name__ == "__main__":
+    main()
