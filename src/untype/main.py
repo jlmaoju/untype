@@ -11,7 +11,7 @@ import pyperclip
 
 from untype.audio import AudioRecorder, normalize_audio
 from untype.clipboard import grab_selected_text, inject_text
-from untype.config import AppConfig, load_config, save_config
+from untype.config import AppConfig, Persona, load_config, load_personas, save_config
 from untype.hotkey import HotkeyListener
 from untype.llm import LLMClient
 from untype.overlay import CapsuleOverlay
@@ -39,6 +39,15 @@ class UnTypeApp:
         self._config = load_config()
         # Deep copy so settings-change detection works (the dialog mutates in-place)
         self._prev_config = copy.deepcopy(self._config)
+
+        # -- Persona system -----------------------------------------------
+        self._personas: list[Persona] = load_personas()
+        if self._personas:
+            logger.info(
+                "Loaded %d persona(s): %s",
+                len(self._personas),
+                ", ".join(p.name for p in self._personas),
+            )
 
         # -- Interaction state (written in on_press, read in pipeline) --------
         self._mode: str = "insert"  # "polish" or "insert"
@@ -270,11 +279,17 @@ class UnTypeApp:
             at_corner = self._window_mismatch
             self._tray.update_status("Ready")
 
+            persona_tuples = [(p.id, p.icon, p.name) for p in self._personas[:3]]
+
             if at_corner:
-                self._overlay.show_staging(text, 0, 0, at_corner=True)
+                self._overlay.show_staging(
+                    text, 0, 0, at_corner=True,
+                    personas=persona_tuples or None,
+                )
             else:
                 self._overlay.show_staging(
                     text, self._caret_x, self._caret_y,
+                    personas=persona_tuples or None,
                 )
 
             # 5. Block until the user acts (Enter / Shift+Enter / Esc).
@@ -293,18 +308,33 @@ class UnTypeApp:
                 inject_text(edited_text, self._original_clipboard)
                 return
 
-            # 6. action == "refine" — send through LLM.
-            # Re-capture target (whatever window now has focus).
-            self._target_window = get_foreground_window()
+            # 6. action == "refine" or "persona:<id>" — send through LLM.
+            # Do NOT re-capture target window here — keep the original one
+            # from hotkey-press time so HWND safety works correctly even if
+            # the user switched windows while the staging area was open.
             caret = get_caret_screen_position()
             self._overlay.show(caret.x, caret.y, "Processing...")
             self._tray.update_status("Processing...")
 
-            result = self._run_llm(edited_text)
+            # Restart HWND monitoring during the LLM call so that window
+            # switches are caught both before and during LLM processing.
+            self._start_hwnd_watcher()
 
-            # 7. Verify window before injection.
-            if self._target_window is not None and not verify_foreground_window(
-                self._target_window
+            # Determine persona (if any).
+            persona: Persona | None = None
+            if action.startswith("persona:"):
+                persona_id = action.split(":", 1)[1]
+                persona = next(
+                    (p for p in self._personas if p.id == persona_id), None,
+                )
+
+            result = self._run_llm(edited_text, persona=persona)
+
+            # 7. Stop watcher and verify window before injection.
+            self._hwnd_watch_active = False
+            if self._target_window is not None and (
+                self._window_mismatch
+                or not verify_foreground_window(self._target_window)
             ):
                 logger.warning(
                     "Window changed during LLM processing — holding result",
@@ -335,19 +365,39 @@ class UnTypeApp:
             self._hwnd_watch_active = False
             self._pipeline_lock.release()
 
-    def _run_llm(self, transcribed_text: str) -> str:
-        """Send transcribed text through the LLM, falling back to raw text."""
+    def _run_llm(self, transcribed_text: str, persona: Persona | None = None) -> str:
+        """Send transcribed text through the LLM, falling back to raw text.
+
+        If *persona* is provided, its prompt/model/temperature/max_tokens
+        overrides are passed to the LLM client for this single call.
+        """
         if self._llm is None:
             logger.warning("LLM not configured — using raw transcription")
             return transcribed_text
 
+        # Build per-call overrides from persona.
+        overrides: dict = {}
+        if persona:
+            if self._mode == "polish" and persona.prompt_polish:
+                overrides["system_prompt"] = persona.prompt_polish
+            elif self._mode == "insert" and persona.prompt_insert:
+                overrides["system_prompt"] = persona.prompt_insert
+            if persona.model:
+                overrides["model"] = persona.model
+            if persona.temperature is not None:
+                overrides["temperature"] = persona.temperature
+            if persona.max_tokens is not None:
+                overrides["max_tokens"] = persona.max_tokens
+
         try:
             if self._mode == "polish":
                 logger.info("Polishing selected text with LLM...")
-                return self._llm.polish(self._selected_text or "", transcribed_text)
+                return self._llm.polish(
+                    self._selected_text or "", transcribed_text, **overrides,
+                )
             else:
                 logger.info("Inserting text via LLM...")
-                return self._llm.insert(transcribed_text)
+                return self._llm.insert(transcribed_text, **overrides)
         except Exception:
             logger.exception("LLM request failed — falling back to raw transcription")
             return transcribed_text
@@ -485,6 +535,10 @@ class UnTypeApp:
             if self._llm is not None:
                 self._llm.close()
             self._llm = self._init_llm_client()
+
+        # --- Personas ---
+        self._personas = load_personas()
+        logger.info("Reloaded %d persona(s)", len(self._personas))
 
         logger.info("Settings update complete")
 

@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import json
+import logging
 import tomllib
 from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 
 import tomli_w
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Config schema
@@ -99,6 +103,23 @@ class AppConfig:
 
 
 # ---------------------------------------------------------------------------
+# Persona schema (stored separately in ~/.untype/personas.json)
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class Persona:
+    id: str
+    name: str
+    icon: str  # emoji, e.g. "📚"
+    prompt_polish: str = ""  # system prompt for polish mode (empty = use global)
+    prompt_insert: str = ""  # system prompt for insert mode (empty = use global)
+    model: str = ""  # override LLM model (empty = use global)
+    temperature: float | None = None  # override (None = use global)
+    max_tokens: int | None = None  # override (None = use global)
+
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
@@ -180,3 +201,71 @@ def save_config(config: AppConfig) -> None:
     data = _config_to_dict(config)
     with open(path, "wb") as f:
         tomli_w.dump(data, f)
+
+
+# ---------------------------------------------------------------------------
+# Persona persistence (JSON)
+# ---------------------------------------------------------------------------
+
+
+def get_personas_dir() -> Path:
+    """Return the path to the personas directory (~/.untype/personas/)."""
+    return Path.home() / ".untype" / "personas"
+
+
+def load_personas() -> list[Persona]:
+    """Load personas from individual JSON files in the personas directory.
+
+    Each ``.json`` file in ``~/.untype/personas/`` should contain a single
+    persona object.  Files are sorted by name so that ordering is predictable
+    (e.g. prefix with ``01_``, ``02_`` to control order).
+
+    Returns an empty list if the directory is missing or contains no valid files.
+    """
+    personas_dir = get_personas_dir()
+    if not personas_dir.is_dir():
+        return []
+
+    known = {f.name for f in fields(Persona)}
+    personas: list[Persona] = []
+
+    for path in sorted(personas_dir.glob("*.json")):
+        try:
+            with open(path, encoding="utf-8") as f:
+                data = json.load(f)
+        except (json.JSONDecodeError, OSError) as exc:
+            logger.warning("Failed to load persona from %s: %s", path, exc)
+            continue
+
+        if not isinstance(data, dict):
+            logger.warning("Persona file %s is not a JSON object — skipping", path.name)
+            continue
+
+        # Require at least id, name, icon.
+        if not all(k in data for k in ("id", "name", "icon")):
+            logger.warning("Persona file %s missing required fields — skipping", path.name)
+            continue
+
+        filtered = {k: v for k, v in data.items() if k in known}
+        try:
+            personas.append(Persona(**filtered))
+        except TypeError:
+            logger.warning("Persona file %s has invalid field types — skipping", path.name)
+            continue
+
+    return personas
+
+
+def save_persona(persona: Persona) -> None:
+    """Write a single persona to its own JSON file.
+
+    The file is named ``<id>.json`` inside ``~/.untype/personas/``.
+    Creates the directory if it does not exist.
+    """
+    personas_dir = get_personas_dir()
+    personas_dir.mkdir(parents=True, exist_ok=True)
+
+    path = personas_dir / f"{persona.id}.json"
+    data = asdict(persona)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)

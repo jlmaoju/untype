@@ -34,6 +34,8 @@ Most voice input tools give you raw transcription — full of "嗯", "那个", b
   在线 API（OpenAI 兼容）或本地推理（faster-whisper）。自由选择。
 - **System tray UI / 系统托盘界面** — Color-coded status indicator + settings dialog.
   带颜色状态指示的托盘图标 + 设置对话框。
+- **Persona Masks / 人格面具** — Switch LLM personalities with Ctrl+1/2/3 or a click. Define custom tone profiles for different contexts: academic, workplace, casual, bullet-point notes — each with its own prompt, model, and temperature. Drop a JSON file into `~/.untype/personas/` to add a new persona.
+  通过 Ctrl+1/2/3 或点击切换 LLM 人格。为不同场景定义语气配置：学术、职场、日常、要点整理——每个都有独立的提示词、模型和温度。往 `~/.untype/personas/` 放一个 JSON 文件就能新增人格。
 
 ## How It Works / 工作原理
 
@@ -41,6 +43,8 @@ Most voice input tools give you raw transcription — full of "嗯", "那个", b
 Hold hotkey → Speak → Release hotkey
                 ↓
         [ STT: speech → raw text ]
+                ↓
+        [ Staging area: edit draft + choose persona ]
                 ↓
         [ LLM: raw text → polished text ]
                 ↓
@@ -96,6 +100,32 @@ Settings are stored in `~/.untype/config.toml` (created on first launch):
 | `llm` | `api_key` | `""` | LLM API key |
 | `llm` | `model` | `""` | LLM model name |
 
+### Personas / 人格面具
+
+Drop JSON files into `~/.untype/personas/` to define personas. Each file is one persona:
+
+在 `~/.untype/personas/` 目录放入 JSON 文件来定义人格面具。每个文件定义一个人格：
+
+```json
+{
+  "id": "academic",
+  "name": "学术",
+  "icon": "📚",
+  "prompt_polish": "",
+  "prompt_insert": "You are an academic writing assistant...",
+  "model": "",
+  "temperature": 0.2,
+  "max_tokens": null
+}
+```
+
+- Files are sorted alphabetically — prefix with `01_`, `02_` to control order.
+  文件按字母排序——用 `01_`、`02_` 前缀控制顺序。
+- First 3 personas appear in the staging area as clickable buttons (Ctrl+1/2/3).
+  前 3 个人格显示在暂存区，可点击或用 Ctrl+1/2/3 选择。
+- Empty fields (`""` or `null`) fall back to global config.
+  空字段（`""` 或 `null`）回退到全局配置。
+
 ## Development / 开发
 
 ```bash
@@ -106,8 +136,10 @@ uv run pytest                # Run tests
 
 ## Roadmap / 开发计划
 
-- **Persona Masks / 人格面具** — Define custom tone profiles for different contexts: formal for your manager, casual for teammates, diplomatic for clients. Switch personas with a click, and UnType adapts its LLM refinement to match. Write once, speak in any voice.
-  为不同场景定义语气配置：给领导的正式严谨，给同事的轻松随意，给客户的圆融得体。一键切换人格面具，UnType 自动调整润色风格。一次配置，百变语气。
+- **Ghost Menu / 后悔药** — Post-injection undo menu: revert to raw draft or regenerate with different wording. No countdown pressure — the undo option stays until you dismiss it.
+  注入后的撤销菜单：恢复原始草稿或重新生成。没有倒计时压力——撤销选项会一直在，直到你主动关掉。
+- **Distribution / 分发** — Standalone `.exe` via PyInstaller/Nuitka. No Python installation required.
+  通过 PyInstaller/Nuitka 打包成独立 `.exe`。无需安装 Python。
 
 ## License / 许可证
 

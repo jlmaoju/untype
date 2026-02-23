@@ -84,44 +84,86 @@ class LLMClient:
     # Public helpers
     # ------------------------------------------------------------------
 
-    def polish(self, original_text: str, instruction: str) -> str:
+    def polish(
+        self,
+        original_text: str,
+        instruction: str,
+        *,
+        system_prompt: str | None = None,
+        model: str | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+    ) -> str:
         """Refine *original_text* according to a voice *instruction*.
 
-        Returns the polished text produced by the LLM.
+        Optional keyword arguments override instance defaults for this
+        single call (used by the persona system).
         """
         user_message = (
             f"<original_text>\n{original_text}\n</original_text>\n\n"
             f"<voice_instruction>\n{instruction}\n</voice_instruction>"
         )
-        return self._chat(self.prompts["polish"], user_message)
+        return self._chat(
+            system_prompt or self.prompts["polish"],
+            user_message,
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
 
-    def insert(self, spoken_text: str) -> str:
+    def insert(
+        self,
+        spoken_text: str,
+        *,
+        system_prompt: str | None = None,
+        model: str | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+    ) -> str:
         """Convert raw *spoken_text* into well-formed written text.
 
-        Returns the cleaned-up text produced by the LLM.
+        Optional keyword arguments override instance defaults for this
+        single call (used by the persona system).
         """
         user_message = f"<transcription>\n{spoken_text}\n</transcription>"
-        return self._chat(self.prompts["insert"], user_message)
+        return self._chat(
+            system_prompt or self.prompts["insert"],
+            user_message,
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
 
     # ------------------------------------------------------------------
     # Internal
     # ------------------------------------------------------------------
 
-    def _chat(self, system: str, user: str) -> str:
+    def _chat(
+        self,
+        system: str,
+        user: str,
+        *,
+        model: str | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+    ) -> str:
         """Send a chat-completion request and return the assistant content.
+
+        Per-call *model*, *temperature*, and *max_tokens* override instance
+        defaults when provided (non-``None``).
 
         Raises:
             httpx.HTTPStatusError: On 4xx / 5xx responses.
             KeyError / IndexError: If the response body is malformed.
         """
         payload = {
-            "model": self.model,
+            "model": model or self.model,
             "messages": [
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
             ],
-            "temperature": self.temperature,
-            "max_tokens": self.max_tokens,
+            "temperature": temperature if temperature is not None else self.temperature,
+            "max_tokens": max_tokens if max_tokens is not None else self.max_tokens,
         }
 
         response = None

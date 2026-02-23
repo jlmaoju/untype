@@ -94,51 +94,51 @@ class SettingsDialog:
         # -- Hotkey -------------------------------------------------------
         row = self._heading(frame, "Hotkey", row)
         hotkey_var = self._text_field(
-            frame, "Trigger:", self._config.hotkey.trigger, row,
+            root, frame, "Trigger:", self._config.hotkey.trigger, row,
         )
         row += 1
 
         # -- LLM ----------------------------------------------------------
         row = self._heading(frame, "LLM", row)
         llm_url_var = self._text_field(
-            frame, "Base URL:", self._config.llm.base_url, row,
+            root, frame, "Base URL:", self._config.llm.base_url, row,
         )
         row += 1
         llm_key_var = self._text_field(
-            frame, "API Key:", self._config.llm.api_key, row, show="*",
+            root, frame, "API Key:", self._config.llm.api_key, row, show="*",
         )
         row += 1
         llm_model_var = self._text_field(
-            frame, "Model:", self._config.llm.model, row,
+            root, frame, "Model:", self._config.llm.model, row,
         )
         row += 1
 
         # -- STT -----------------------------------------------------------
         row = self._heading(frame, "Speech-to-Text", row)
         stt_backend_var = self._combo_field(
-            frame, "Backend:", self._config.stt.backend,
+            root, frame, "Backend:", self._config.stt.backend,
             ["api", "local"], row,
         )
         row += 1
         stt_api_url_var = self._text_field(
-            frame, "STT API URL:", self._config.stt.api_base_url, row,
+            root, frame, "STT API URL:", self._config.stt.api_base_url, row,
         )
         row += 1
         stt_api_key_var = self._text_field(
-            frame, "STT API Key:", self._config.stt.api_key, row, show="*",
+            root, frame, "STT API Key:", self._config.stt.api_key, row, show="*",
         )
         row += 1
         stt_api_model_var = self._text_field(
-            frame, "STT API Model:", self._config.stt.api_model, row,
+            root, frame, "STT API Model:", self._config.stt.api_model, row,
         )
         row += 1
         stt_model_var = self._combo_field(
-            frame, "Local model:", self._config.stt.model_size,
+            root, frame, "Local model:", self._config.stt.model_size,
             ["small", "medium", "large-v3"], row,
         )
         row += 1
         stt_device_var = self._combo_field(
-            frame, "Local device:", self._config.stt.device,
+            root, frame, "Local device:", self._config.stt.device,
             ["auto", "cuda", "cpu"], row,
         )
         row += 1
@@ -146,7 +146,7 @@ class SettingsDialog:
         # -- Audio ---------------------------------------------------------
         row = self._heading(frame, "Audio", row)
         gain_var = self._number_field(
-            frame, "Gain boost:", self._config.audio.gain_boost, row,
+            root, frame, "Gain boost:", self._config.audio.gain_boost, row,
         )
         row += 1
 
@@ -198,6 +198,7 @@ class SettingsDialog:
 
     @staticmethod
     def _text_field(
+        master: tk.Tk,
         parent: ttk.Frame,
         label: str,
         value: str,
@@ -207,7 +208,7 @@ class SettingsDialog:
     ) -> tk.StringVar:
         """Add a labelled text entry and return the associated StringVar."""
         ttk.Label(parent, text=label).grid(row=row, column=0, sticky="w", padx=(0, 8), pady=2)
-        var = tk.StringVar(value=value)
+        var = tk.StringVar(master=master, value=value)
         entry = ttk.Entry(parent, textvariable=var, width=48)
         if show:
             entry.configure(show=show)
@@ -216,6 +217,7 @@ class SettingsDialog:
 
     @staticmethod
     def _combo_field(
+        master: tk.Tk,
         parent: ttk.Frame,
         label: str,
         value: str,
@@ -224,13 +226,14 @@ class SettingsDialog:
     ) -> tk.StringVar:
         """Add a labelled dropdown and return the associated StringVar."""
         ttk.Label(parent, text=label).grid(row=row, column=0, sticky="w", padx=(0, 8), pady=2)
-        var = tk.StringVar(value=value)
+        var = tk.StringVar(master=master, value=value)
         combo = ttk.Combobox(parent, textvariable=var, values=options, width=45, state="readonly")
         combo.grid(row=row, column=1, sticky="ew", pady=2)
         return var
 
     @staticmethod
     def _number_field(
+        master: tk.Tk,
         parent: ttk.Frame,
         label: str,
         value: float,
@@ -238,7 +241,7 @@ class SettingsDialog:
     ) -> tk.DoubleVar:
         """Add a labelled numeric entry and return the associated DoubleVar."""
         ttk.Label(parent, text=label).grid(row=row, column=0, sticky="w", padx=(0, 8), pady=2)
-        var = tk.DoubleVar(value=value)
+        var = tk.DoubleVar(master=master, value=value)
         ttk.Entry(parent, textvariable=var, width=48).grid(
             row=row, column=1, sticky="ew", pady=2,
         )

@@ -179,22 +179,35 @@ class CapsuleOverlay:
         self._queue.put(("HIDE_BUBBLE",))
 
     def show_staging(
-        self, text: str, x: int, y: int, at_corner: bool = False,
+        self,
+        text: str,
+        x: int,
+        y: int,
+        at_corner: bool = False,
+        personas: list[tuple[str, str, str]] | None = None,
     ) -> None:
         """Show the editable staging area with draft text.
 
         Hides the capsule first.  The staging area is a focusable window that
         accepts keyboard input (unlike the capsule).  If the capsule is
         mid-flight, the staging area is deferred until the flight lands.
+
+        *personas* is an optional list of ``(id, icon, name)`` tuples for the
+        persona bar.  When provided, clickable persona buttons and Ctrl+1/2/3
+        shortcuts are added to the staging UI.
         """
         self._staging_event.clear()
-        self._queue.put(("STAGING_SHOW", text, x, y, at_corner))
+        self._queue.put(("STAGING_SHOW", text, x, y, at_corner, personas))
 
     def wait_staging(self) -> tuple[str, str]:
         """Block until the user acts on the staging area.
 
-        Returns ``(edited_text, action)`` where *action* is ``"refine"``
-        (Enter), ``"raw"`` (Shift+Enter), or ``"cancel"`` (Escape).
+        Returns ``(edited_text, action)`` where *action* is one of:
+
+        - ``"refine"`` — Enter (default LLM refinement)
+        - ``"persona:<id>"`` — persona-specific refinement
+        - ``"raw"`` — Shift+Enter (inject raw)
+        - ``"cancel"`` — Escape
         """
         self._staging_event.wait()
         return self._staging_result_text, self._staging_result_action
@@ -301,8 +314,8 @@ class CapsuleOverlay:
         elif op == "HIDE_BUBBLE":
             self._do_hide_hold_bubble()
         elif op == "STAGING_SHOW":
-            _, text, x, y, at_corner = cmd
-            self._do_show_staging(text, x, y, at_corner)
+            _, text, x, y, at_corner, personas = cmd
+            self._do_show_staging(text, x, y, at_corner, personas)
         elif op == "QUIT":
             self._do_quit()
 
@@ -625,13 +638,18 @@ class CapsuleOverlay:
     # ------------------------------------------------------------------
 
     def _do_show_staging(
-        self, text: str, x: int, y: int, at_corner: bool,
+        self,
+        text: str,
+        x: int,
+        y: int,
+        at_corner: bool,
+        personas: list[tuple[str, str, str]] | None = None,
     ) -> None:
         """Create and show the editable staging area."""
         # If capsule is mid-flight, defer until the flight lands so the
         # user sees the complete fly-to-corner animation.
         if self._flying:
-            self._pending_staging = (text, x, y, at_corner)
+            self._pending_staging = (text, x, y, at_corner, personas)
             return
 
         # Hide capsule and any existing bubble.
@@ -683,12 +701,66 @@ class CapsuleOverlay:
         text_widget.insert("1.0", text)
         text_widget.mark_set("insert", "end-1c")
 
+        # Persona bar (only when personas are provided).
+        if personas:
+            persona_frame = tk.Frame(inner, bg="#2a2a2a")
+            persona_frame.pack(fill="x", padx=8, pady=(0, 4))
+
+            for idx, (pid, icon, name) in enumerate(personas[:3]):
+                label = tk.Label(
+                    persona_frame,
+                    text=f" {icon} {name} ",
+                    font=("Segoe UI", 9),
+                    bg="#3a3a3a",
+                    fg="#c0c0c0",
+                    cursor="hand2",
+                    padx=4,
+                    pady=2,
+                )
+                label.pack(side="left", padx=(0, 6))
+
+                # Bind click to resolve with this persona.
+                persona_action = f"persona:{pid}"
+                label.bind(
+                    "<Button-1>",
+                    lambda e, a=persona_action: self._resolve_staging(a),
+                )
+
+                # Hover effect.
+                label.bind(
+                    "<Enter>",
+                    lambda e, w=label: w.configure(bg="#4a4a4a", fg="#ffffff"),
+                )
+                label.bind(
+                    "<Leave>",
+                    lambda e, w=label: w.configure(bg="#3a3a3a", fg="#c0c0c0"),
+                )
+
+            # Bind Ctrl+1/2/3 on the text widget for keyboard persona selection.
+            for idx, (pid, _, _) in enumerate(personas[:3]):
+                key_num = str(idx + 1)
+                persona_action = f"persona:{pid}"
+                text_widget.bind(
+                    f"<Control-Key-{key_num}>",
+                    lambda e, a=persona_action: (
+                        self._resolve_staging(a), "break"
+                    )[-1],
+                )
+
         # Hint bar.
-        hint_text = (
-            "Enter \u6da6\u8272  \u2502  "
-            "Shift+Enter \u76f4\u63a5\u53d1\u9001  \u2502  "
-            "Esc \u53d6\u6d88"
-        )
+        if personas:
+            hint_text = (
+                "Enter \u6da6\u8272  \u2502  "
+                "Ctrl+1~3 \u4eba\u683c  \u2502  "
+                "Shift+Enter \u76f4\u63a5\u53d1\u9001  \u2502  "
+                "Esc \u53d6\u6d88"
+            )
+        else:
+            hint_text = (
+                "Enter \u6da6\u8272  \u2502  "
+                "Shift+Enter \u76f4\u63a5\u53d1\u9001  \u2502  "
+                "Esc \u53d6\u6d88"
+            )
         hint = tk.Label(
             inner,
             text=hint_text,
@@ -704,12 +776,15 @@ class CapsuleOverlay:
         text_widget.bind("<Shift-Return>", self._on_staging_shift_enter)
         text_widget.bind("<Escape>", self._on_staging_escape)
 
+        # Increase height when persona bar is present.
+        staging_h = _STAGING_H + 32 if personas else _STAGING_H
+
         # Position.
         if at_corner:
             screen_w = win.winfo_screenwidth()
             screen_h = win.winfo_screenheight()
             px = screen_w - _STAGING_W - 24
-            py = screen_h - _STAGING_H - 80
+            py = screen_h - staging_h - 80
         else:
             px = x + 12
             py = y + 24
@@ -717,10 +792,10 @@ class CapsuleOverlay:
             screen_h = win.winfo_screenheight()
             if px + _STAGING_W > screen_w:
                 px = x - _STAGING_W - 12
-            if py + _STAGING_H > screen_h:
-                py = y - _STAGING_H - 8
+            if py + staging_h > screen_h:
+                py = y - staging_h - 8
 
-        win.geometry(f"{_STAGING_W}x{_STAGING_H}+{px}+{py}")
+        win.geometry(f"{_STAGING_W}x{staging_h}+{px}+{py}")
         win.deiconify()
         win.lift()
         win.focus_force()
