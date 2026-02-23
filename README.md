@@ -2,9 +2,15 @@
 
 > 得意忘言 — Speak your mind, forget about typing.
 
-**UnType** is an open-source, AI-powered voice input tool for Windows. It doesn't just transcribe — it **thinks**. Your speech goes through STT, then an LLM automatically cleans up the text: fixing punctuation, removing filler words, correcting recognition errors. Select existing text and speak to edit it with natural language. One hotkey does it all.
+**UnType** is an open-source, AI-powered voice input tool for Windows. It doesn't just transcribe — it **thinks**. One hotkey, two superpowers:
 
-**UnType** 是一个开源的 AI 语音输入工具。它不只是转录——它会**思考**。语音经过 STT 转录后，LLM 自动润色文本：修正标点、去除语气词、纠正识别错误。选中已有文字后说话，即可用自然语言编辑它。一个快捷键，从说话到成稿。
+**UnType** 是一个开源的 AI 语音输入工具。它不只是转录——它会**思考**。一个快捷键，两种超能力：
+
+1. **Speak to insert / 说话即输入** — Your speech is transcribed by STT, then an LLM automatically refines it into clean text: removing filler words ("嗯", "那个", "um"), fixing punctuation, correcting recognition errors. What reaches your cursor is a polished draft, not a raw dump.
+   语音经 STT 转录后，LLM 自动润色：去除语气词、修正标点、纠正识别错误。到达光标的是润色后的成稿，不是原始语音垃圾。
+
+2. **Select to polish / 选中即润色** — Select existing text, speak an instruction ("make it shorter", "translate to English", "改成更正式的语气"), and the LLM rewrites it for you. Voice-controlled text editing, anywhere.
+   选中已有文字，说出修改指令，LLM 帮你改写。语音驱动的文字编辑，随处可用。
 
 ## Why UnType? / 为什么选 UnType？
 
@@ -12,13 +18,9 @@ Most voice input tools give you raw transcription — full of "嗯", "那个", b
 
 大多数语音输入工具只给你原始转录——充满"嗯"、"那个"、标点错误和识别偏差。你最终花在修正上的时间，比省下的打字时间还多。
 
-**UnType = STT + LLM.** Your speech is transcribed, then an LLM refines it into clean, well-formatted text — ready to use as-is.
+**UnType = STT + LLM.** Your speech is transcribed, then an LLM refines it into clean, well-formatted text — ready to use as-is. And when you need to edit existing text, just select it and speak.
 
-**UnType = STT + LLM。** 语音先转录，再由 LLM 润色为干净、规范的文本——开口即终稿。
-
-**And it goes further:** select text, speak an instruction, and UnType rewrites it for you. "把这段改得更正式一点" — done.
-
-**更进一步：** 选中文字，说出修改指令，UnType 帮你改写。"把这段改得更正式一点"——搞定。
+**UnType = STT + LLM。** 语音先转录，再由 LLM 润色为干净、规范的文本——开口即终稿。需要编辑已有文字时，选中它，说话就行。
 
 ## Features / 功能
 
@@ -101,6 +103,11 @@ uv run ruff check src/      # Lint
 uv run ruff format src/      # Format
 uv run pytest                # Run tests
 ```
+
+## Roadmap / 开发计划
+
+- **Persona Masks / 人格面具** — Define custom tone profiles for different contexts: formal for your manager, casual for teammates, diplomatic for clients. Switch personas with a click, and UnType adapts its LLM refinement to match. Write once, speak in any voice.
+  为不同场景定义语气配置：给领导的正式严谨，给同事的轻松随意，给客户的圆融得体。一键切换人格面具，UnType 自动调整润色风格。一次配置，百变语气。
 
 ## License / 许可证
 
