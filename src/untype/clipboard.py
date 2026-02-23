@@ -7,6 +7,8 @@ import time
 import pyperclip
 from pynput.keyboard import Controller, Key
 
+from untype.platform import get_modifier_key
+
 _keyboard = Controller()
 
 
@@ -46,7 +48,7 @@ def grab_selected_text() -> tuple[str | None, str | None]:
         return None, original
 
     # Simulate Ctrl+C to copy the current selection.
-    _simulate_hotkey(Key.ctrl_l, "c")
+    _simulate_hotkey(get_modifier_key(), "c")
     time.sleep(0.15)
 
     # Read whatever ended up on the clipboard.
@@ -72,7 +74,7 @@ def inject_text(text: str, original_clipboard: str | None) -> None:
         return
 
     time.sleep(0.05)
-    _simulate_hotkey(Key.ctrl_l, "v")
+    _simulate_hotkey(get_modifier_key(), "v")
     time.sleep(0.1)
 
     restore_clipboard(original_clipboard)
