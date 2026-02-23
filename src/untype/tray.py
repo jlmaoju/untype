@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import threading
 import tkinter as tk
 from tkinter import ttk
@@ -11,7 +12,7 @@ from typing import Callable
 import pystray
 from PIL import Image, ImageDraw
 
-from untype.config import AppConfig, save_config
+from untype.config import AppConfig, get_personas_dir, save_config
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,6 @@ logger = logging.getLogger(__name__)
 
 _STATUS_COLORS: dict[str, str] = {
     "Ready": "#4CAF50",          # green
-    "Listening...": "#CDDC39",   # yellow-green
     "Recording...": "#FF9800",   # orange
     "Transcribing...": "#2196F3",# blue
     "Processing...": "#9C27B0",  # purple
@@ -381,6 +381,10 @@ class TrayApp:
                 "Settings...",
                 self._on_settings_clicked,
             ),
+            pystray.MenuItem(
+                "Personas...",
+                self._on_personas_clicked,
+            ),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(
                 "Quit",
@@ -400,6 +404,12 @@ class TrayApp:
             daemon=True,
         )
         thread.start()
+
+    def _on_personas_clicked(self, icon: pystray.Icon, item: pystray.MenuItem) -> None:
+        """Open the personas folder in the file explorer."""
+        personas_dir = get_personas_dir()
+        personas_dir.mkdir(parents=True, exist_ok=True)
+        os.startfile(personas_dir)
 
     def _show_settings_dialog(self) -> None:
         """Create and show the settings dialog (runs on its own thread)."""

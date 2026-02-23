@@ -173,7 +173,12 @@ class UnTypeApp:
     # ------------------------------------------------------------------
 
     def _start_recording(self) -> None:
-        """Probe the clipboard and start the microphone.
+        """Capture HWND, start recording immediately, then probe clipboard.
+
+        Recording starts before the clipboard probe so that the first
+        words of speech are not lost to the probe delay.  The mode
+        (insert vs polish) is determined after recording is already
+        capturing audio.
 
         This is spawned by :meth:`_on_hotkey_press` on a short-lived worker
         thread so the keyboard hook callback returns immediately.  The
@@ -199,10 +204,15 @@ class UnTypeApp:
                 caret.x, caret.y, caret.found,
             )
 
-            self._tray.update_status("Listening...")
-            self._overlay.show(self._caret_x, self._caret_y, "Listening...")
+            # Start recording FIRST so the user's speech is captured from
+            # the moment they press the hotkey, not after the clipboard probe.
+            logger.info("Starting audio recording...")
+            self._recorder.start()
+            self._tray.update_status("Recording...")
+            self._overlay.show(self._caret_x, self._caret_y, "Recording...")
 
             # Grab selected text to determine the interaction mode.
+            # This happens while recording is already running.
             logger.info("Grabbing selected text...")
             self._selected_text, self._original_clipboard = grab_selected_text()
 
@@ -212,12 +222,6 @@ class UnTypeApp:
             else:
                 self._mode = "insert"
                 logger.info("Mode: insert (no selection detected)")
-
-            # Start recording.
-            logger.info("Starting audio recording...")
-            self._recorder.start()
-            self._tray.update_status("Recording...")
-            self._overlay.update_status("Recording...")
 
             # Start continuous HWND monitoring.
             self._start_hwnd_watcher()
@@ -279,7 +283,7 @@ class UnTypeApp:
             at_corner = self._window_mismatch
             self._tray.update_status("Ready")
 
-            persona_tuples = [(p.id, p.icon, p.name) for p in self._personas[:3]]
+            persona_tuples = [(p.id, p.icon, p.name) for p in self._personas]
 
             if at_corner:
                 self._overlay.show_staging(

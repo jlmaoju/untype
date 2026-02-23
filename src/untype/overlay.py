@@ -363,7 +363,7 @@ class CapsuleOverlay:
         # Start/stop alpha-breathing animation.
         _ANIM_STATUSES = (
             "Recording...", "Transcribing...",
-            "Processing...", "Listening...",
+            "Processing...",
         )
         should_animate = status in _ANIM_STATUSES
         if should_animate and not self._animating:
@@ -706,7 +706,7 @@ class CapsuleOverlay:
             persona_frame = tk.Frame(inner, bg="#2a2a2a")
             persona_frame.pack(fill="x", padx=8, pady=(0, 4))
 
-            for idx, (pid, icon, name) in enumerate(personas[:3]):
+            for idx, (pid, icon, name) in enumerate(personas):
                 label = tk.Label(
                     persona_frame,
                     text=f" {icon} {name} ",
@@ -736,8 +736,8 @@ class CapsuleOverlay:
                     lambda e, w=label: w.configure(bg="#3a3a3a", fg="#c0c0c0"),
                 )
 
-            # Bind Ctrl+1/2/3 on the text widget for keyboard persona selection.
-            for idx, (pid, _, _) in enumerate(personas[:3]):
+            # Bind Ctrl+1..9 on the text widget for keyboard persona selection.
+            for idx, (pid, _, _) in enumerate(personas[:9]):
                 key_num = str(idx + 1)
                 persona_action = f"persona:{pid}"
                 text_widget.bind(
@@ -749,9 +749,14 @@ class CapsuleOverlay:
 
         # Hint bar.
         if personas:
+            n = min(len(personas), 9)
+            if n == 1:
+                shortcut_hint = "Ctrl+1 \u4eba\u683c"
+            else:
+                shortcut_hint = f"Ctrl+1~{n} \u4eba\u683c"
             hint_text = (
                 "Enter \u6da6\u8272  \u2502  "
-                "Ctrl+1~3 \u4eba\u683c  \u2502  "
+                f"{shortcut_hint}  \u2502  "
                 "Shift+Enter \u76f4\u63a5\u53d1\u9001  \u2502  "
                 "Esc \u53d6\u6d88"
             )
