@@ -1,7 +1,7 @@
 [project]
 name = "untype"
 version = "0.1.0"
-description = "Open-source voice input for Windows — speak your mind, forget about typing"
+description = "AI-powered voice input for Windows — STT + LLM, from speech to polished text"
 readme = "README.md"
 license = "GPL-3.0-or-later"
 requires-python = ">=3.11"

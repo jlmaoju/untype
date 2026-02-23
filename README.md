@@ -2,28 +2,71 @@
 
 > 得意忘言 — Speak your mind, forget about typing.
 
-**UnType** is an open-source voice input tool for Windows. Press a hotkey, speak, and your words appear at the cursor — transcribed, cleaned up, and ready to go. No typing required.
+**UnType** is an open-source, AI-powered voice input tool for Windows. It doesn't just transcribe — it **thinks**. Your speech goes through STT, then an LLM automatically cleans up the text: fixing punctuation, removing filler words, correcting recognition errors. Select existing text and speak to edit it with natural language. One hotkey does it all.
 
-**UnType** 是一个开源的 Windows 语音输入工具。按下快捷键，说话，文字就会出现在光标处——自动转录、自动整理、即刻可用。不用打字。
+**UnType** 是一个开源的 AI 语音输入工具。它不只是转录——它会**思考**。语音经过 STT 转录后，LLM 自动润色文本：修正标点、去除语气词、纠正识别错误。选中已有文字后说话，即可用自然语言编辑它。一个快捷键，从说话到成稿。
+
+## Why UnType? / 为什么选 UnType？
+
+Most voice input tools give you raw transcription — full of "嗯", "那个", broken punctuation, and recognition errors. You end up spending time fixing what was supposed to save you time.
+
+大多数语音输入工具只给你原始转录——充满"嗯"、"那个"、标点错误和识别偏差。你最终花在修正上的时间，比省下的打字时间还多。
+
+**UnType = STT + LLM.** Your speech is transcribed, then an LLM refines it into clean, well-formatted text — ready to use as-is.
+
+**UnType = STT + LLM。** 语音先转录，再由 LLM 润色为干净、规范的文本——开口即终稿。
+
+**And it goes further:** select text, speak an instruction, and UnType rewrites it for you. "把这段改得更正式一点" — done.
+
+**更进一步：** 选中文字，说出修改指令，UnType 帮你改写。"把这段改得更正式一点"——搞定。
 
 ## Features / 功能
 
-- **Push-to-Talk** — Hold a hotkey (default: F6) to record, release to process.
-  按住快捷键（默认 F6）录音，松开后自动处理。
-- **Two modes, auto-detected / 两种模式，自动检测：**
-  - **Insert mode / 插入模式** — No text selected: voice input is cleaned up and inserted at the cursor.
-    没有选中文字时，语音输入整理后插入到光标处。
-  - **Polish mode / 润色模式** — Text selected: voice instruction is applied to modify the selected text.
-    选中文字后，语音指令会被应用到选中的文字上进行修改。
-- **LLM refinement / LLM 润色** — Transcribed text is automatically refined by an LLM: fixing punctuation, removing filler words, correcting recognition errors. Falls back to raw transcription if unconfigured.
-  转录文本由 LLM 自动润色：修正标点、去除语气词、纠正识别错误。未配置时直接使用原始转录结果。
-- **Dual STT backends / 双语音识别后端：**
-  - Online API (OpenAI-compatible, e.g. `gpt-4o-transcribe`)
-    在线 API（OpenAI 兼容，如 `gpt-4o-transcribe`）
-  - Local inference via [faster-whisper](https://github.com/SYSTRAN/faster-whisper)
-    本地推理（基于 faster-whisper）
-- **System tray UI / 系统托盘界面** — Status indicator with color-coded states + settings dialog.
-  带颜色状态指示的系统托盘图标 + 设置对话框。
+- **AI-refined output / AI 润色输出** — Not raw transcription. LLM automatically fixes punctuation, filler words, grammar, and recognition errors before text reaches your cursor.
+  不是原始转录。LLM 在文本到达光标前，自动修正标点、语气词、语法和识别错误。
+- **Voice-edit selected text / 语音编辑选中文字** — Select text, speak an instruction ("make it shorter", "translate to English", "改成被动语态"), and the LLM applies it. Like a voice-controlled find-and-replace on steroids.
+  选中文字，说出指令，LLM 执行修改。语音版的超级查找替换。
+- **Push-to-Talk** — Hold a hotkey (default: F6) to record, release to process. Works in any application.
+  按住快捷键（默认 F6）录音，松开后处理。在任何应用中都能用。
+- **Dual STT backends / 双语音识别后端** — Online API (OpenAI-compatible) or local inference via [faster-whisper](https://github.com/SYSTRAN/faster-whisper). Your choice.
+  在线 API（OpenAI 兼容）或本地推理（faster-whisper）。自由选择。
+- **System tray UI / 系统托盘界面** — Color-coded status indicator + settings dialog.
+  带颜色状态指示的托盘图标 + 设置对话框。
+
+## How It Works / 工作原理
+
+```
+Hold hotkey → Speak → Release hotkey
+                ↓
+        [ STT: speech → raw text ]
+                ↓
+        [ LLM: raw text → polished text ]
+                ↓
+        Text appears at your cursor ✓
+```
+
+**Two modes, auto-detected:**
+
+| Mode | Trigger | What happens |
+|------|---------|-------------|
+| **Insert** | No text selected | Speech → STT → LLM cleanup → insert at cursor |
+| **Polish** | Text selected | Speech becomes an instruction → LLM modifies the selected text |
+
+## Quick Start / 快速开始
+
+```bash
+git clone https://github.com/jlmaoju/untype.git
+cd untype
+uv sync
+uv run untype
+```
+
+1. A green circle appears in the system tray. Right-click → **Settings** → fill in your API keys.
+   系统托盘出现绿色圆点。右键 → **Settings** → 填入 API 密钥。
+2. Click in any text field, hold **F6**, speak, release **F6**.
+   在任意输入框中点击，按住 **F6**，说话，松开 **F6**。
+3. Polished text appears at your cursor.
+   润色好的文字出现在光标处。
 
 ## Requirements / 环境要求
 
@@ -32,48 +75,11 @@
 - [uv](https://docs.astral.sh/uv/) (recommended package manager)
 - A working microphone
 - An OpenAI-compatible STT API key (for online mode), or a GPU for local Whisper inference
-
-## Installation / 安装
-
-```bash
-git clone https://github.com/jlmaoju/untype.git
-cd untype
-uv sync
-```
-
-## Usage / 使用
-
-```bash
-uv run untype
-```
-
-On first launch, a default config file is created at `~/.untype/config.toml`. You need to configure at least the STT API credentials (or switch to local mode) before using the app.
-
-首次启动时会在 `~/.untype/config.toml` 创建默认配置文件。使用前至少需要配置 STT API 凭证（或切换为本地模式）。
-
-Right-click the system tray icon to access **Settings** where you can configure:
-
-右键系统托盘图标进入 **Settings** 可配置：
-
-- Hotkey trigger / 快捷键
-- STT backend (API or local) / 语音识别后端（API 或本地）
-- LLM API credentials and model / LLM API 凭证和模型
-- Audio gain boost / 音频增益
-
-### Quick Start / 快速开始
-
-1. Launch the app — a green circle appears in the system tray.
-   启动应用——系统托盘出现绿色圆点。
-2. Right-click tray icon → **Settings** → fill in your API keys.
-   右键托盘图标 → **Settings** → 填入 API 密钥。
-3. Click in any text field, hold **F6**, speak, release **F6**.
-   在任意输入框中点击，按住 **F6**，说话，松开 **F6**。
-4. Your speech is transcribed, refined, and inserted at the cursor.
-   语音会被转录、整理，然后插入到光标位置。
+- An OpenAI-compatible LLM API key (for text refinement; optional but recommended)
 
 ## Configuration / 配置
 
-Settings are stored in `~/.untype/config.toml`:
+Settings are stored in `~/.untype/config.toml` (created on first launch):
 
 | Section | Key | Default | Description |
 |---------|-----|---------|-------------|
