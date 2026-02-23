@@ -11,7 +11,7 @@ from typing import Callable
 import pystray
 from PIL import Image, ImageDraw
 
-from talk.config import AppConfig, save_config
+from untype.config import AppConfig, save_config
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +54,7 @@ def _create_icon_image(color: str = _DEFAULT_ICON_COLOR, size: int = 64) -> Imag
 
 
 class SettingsDialog:
-    """Tkinter settings dialog for editing the Talk configuration.
+    """Tkinter settings dialog for editing the UnType configuration.
 
     Because tkinter is *not* thread-safe, the dialog creates its own
     :class:`tkinter.Tk` root (hidden) and runs a local mainloop on the
@@ -79,7 +79,7 @@ class SettingsDialog:
     def show(self) -> None:
         """Show the settings dialog (blocks until closed)."""
         root = tk.Tk()
-        root.title("Talk — Settings")
+        root.title("UnType — Settings")
         root.resizable(False, False)
         root.attributes("-topmost", True)
 
@@ -332,9 +332,9 @@ class TrayApp:
     def run(self) -> None:
         """Run the system tray icon (**blocks** the calling thread)."""
         self._icon = pystray.Icon(
-            name="Talk",
+            name="UnType",
             icon=_create_icon_image(_STATUS_COLORS.get(self._status, _DEFAULT_ICON_COLOR)),
-            title=f"Talk - {self._status}",
+            title=f"UnType - {self._status}",
             menu=self._build_menu(),
         )
         logger.info("Starting system tray icon")
@@ -349,7 +349,7 @@ class TrayApp:
 
         color = _STATUS_COLORS.get(status, _DEFAULT_ICON_COLOR)
         icon.icon = _create_icon_image(color)
-        icon.title = f"Talk - {status}"
+        icon.title = f"UnType - {status}"
         # Rebuild the menu so the status line reflects the new state.
         icon.menu = self._build_menu()
         icon.update_menu()
@@ -370,7 +370,7 @@ class TrayApp:
         """Build the right-click context menu."""
         return pystray.Menu(
             pystray.MenuItem(
-                f"Talk - {self._status}",
+                f"UnType - {self._status}",
                 action=None,
                 enabled=False,
             ),
@@ -393,7 +393,7 @@ class TrayApp:
         """Open the settings dialog on a dedicated thread."""
         thread = threading.Thread(
             target=self._show_settings_dialog,
-            name="talk-settings-dialog",
+            name="untype-settings-dialog",
             daemon=True,
         )
         thread.start()

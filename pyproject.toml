@@ -1,14 +1,14 @@
 [project]
-name = "talk"
+name = "untype"
 version = "0.1.0"
-description = "Whispered speech assistive input system for Windows"
+description = "Open-source voice input for Windows — speak your mind, forget about typing"
 readme = "README.md"
 license = "GPL-3.0-or-later"
 requires-python = ">=3.11"
 authors = [
     { name = "jlmaoju" },
 ]
-keywords = ["voice-input", "speech-to-text", "whisper", "push-to-talk", "windows"]
+keywords = ["voice-input", "speech-to-text", "voice-typing", "push-to-talk", "windows"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Win32 (MS Windows)",
@@ -35,19 +35,19 @@ dependencies = [
 ]
 
 [project.scripts]
-talk = "talk.main:main"
+untype = "untype.main:main"
 
 [project.urls]
-Homepage = "https://github.com/jlmaoju/talk"
-Repository = "https://github.com/jlmaoju/talk"
-Issues = "https://github.com/jlmaoju/talk/issues"
+Homepage = "https://github.com/jlmaoju/untype"
+Repository = "https://github.com/jlmaoju/untype"
+Issues = "https://github.com/jlmaoju/untype/issues"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/talk"]
+packages = ["src/untype"]
 
 [tool.ruff]
 src = ["src"]

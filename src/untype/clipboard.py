@@ -1,4 +1,4 @@
-"""Clipboard operations for the Talk interaction pipeline."""
+"""Clipboard operations for the UnType interaction pipeline."""
 
 from __future__ import annotations
 

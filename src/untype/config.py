@@ -103,8 +103,8 @@ class AppConfig:
 # ---------------------------------------------------------------------------
 
 def get_config_path() -> Path:
-    """Return the path to the config file (~/.talk/config.toml)."""
-    return Path.home() / ".talk" / "config.toml"
+    """Return the path to the config file (~/.untype/config.toml)."""
+    return Path.home() / ".untype" / "config.toml"
 
 
 def _merge_into_dataclass(cls: type, data: dict) -> object:
@@ -172,7 +172,7 @@ def load_config() -> AppConfig:
 def save_config(config: AppConfig) -> None:
     """Save *config* to the TOML config file.
 
-    Creates the ~/.talk/ directory if it does not exist.
+    Creates the ~/.untype/ directory if it does not exist.
     """
     path = get_config_path()
     path.parent.mkdir(parents=True, exist_ok=True)

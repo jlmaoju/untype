@@ -1,4 +1,4 @@
-"""Main entry point — orchestrates all Talk modules together."""
+"""Main entry point — orchestrates all UnType modules together."""
 
 from __future__ import annotations
 
@@ -7,18 +7,18 @@ import logging
 import threading
 import time
 
-from talk.audio import AudioRecorder, normalize_audio
-from talk.clipboard import grab_selected_text, inject_text
-from talk.config import AppConfig, load_config, save_config
-from talk.hotkey import HotkeyListener
-from talk.llm import LLMClient
-from talk.stt import STTApiEngine, STTEngine
-from talk.tray import TrayApp
+from untype.audio import AudioRecorder, normalize_audio
+from untype.clipboard import grab_selected_text, inject_text
+from untype.config import AppConfig, load_config, save_config
+from untype.hotkey import HotkeyListener
+from untype.llm import LLMClient
+from untype.stt import STTApiEngine, STTEngine
+from untype.tray import TrayApp
 
 logger = logging.getLogger(__name__)
 
 
-class TalkApp:
+class UnTypeApp:
     """Main application orchestrator.
 
     Wires together the hotkey listener, audio recorder, STT engine, LLM
@@ -79,7 +79,7 @@ class TalkApp:
         blocks until the user quits.
         """
         self._hotkey.start()
-        logger.info("Talk is ready.  Hold %s to speak.", self._config.hotkey.trigger)
+        logger.info("UnType is ready.  Hold %s to speak.", self._config.hotkey.trigger)
         self._tray.update_status("Ready")
 
         # tray.run() blocks until the user selects Quit.
@@ -106,7 +106,7 @@ class TalkApp:
         self._press_active = True
         self._recording_started.clear()
         threading.Thread(
-            target=self._start_recording, name="talk-rec-start", daemon=True,
+            target=self._start_recording, name="untype-rec-start", daemon=True,
         ).start()
 
     def _on_hotkey_release(self) -> None:
@@ -119,7 +119,7 @@ class TalkApp:
             return
         self._press_active = False
         threading.Thread(
-            target=self._process_pipeline, name="talk-pipeline", daemon=True,
+            target=self._process_pipeline, name="untype-pipeline", daemon=True,
         ).start()
 
     # ------------------------------------------------------------------
@@ -398,12 +398,12 @@ class TalkApp:
 
 
 def main() -> None:
-    """Entry point for the Talk application."""
+    """Entry point for the UnType application."""
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
     )
-    app = TalkApp()
+    app = UnTypeApp()
     app.run()
 
 

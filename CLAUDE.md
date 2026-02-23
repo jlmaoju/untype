@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Talk** is a whispered-speech assistive input system for Windows. It captures whispered speech via a headset microphone, transcribes it (via online API or local faster-whisper), refines/polishes the text through an LLM API, and injects the result at the current cursor position — all triggered by a single push-to-talk hotkey.
+**UnType** (忘言) is an open-source voice input tool for Windows. It captures speech via a headset microphone, transcribes it (via online API or local faster-whisper), refines/polishes the text through an LLM API, and injects the result at the current cursor position — all triggered by a single push-to-talk hotkey.
 
 Core flow: `Hotkey → Clipboard probe → Push-to-Talk audio capture → STT (API or local) → LLM refinement → Clipboard inject + simulated paste`
 
@@ -26,8 +26,8 @@ Two operating modes determined automatically on trigger:
 ```bash
 # Setup
 uv sync                          # Install all dependencies
-uv run python -m talk            # Run the application
-uv run talk                      # Run via entry point
+uv run python -m untype          # Run the application
+uv run untype                    # Run via entry point
 
 # Development
 uv run pytest                    # Run all tests
@@ -40,10 +40,10 @@ uv run ruff format src/          # Format
 ## Architecture
 
 ```
-src/talk/
+src/untype/
 ├── __init__.py
-├── main.py          # Entry point + TalkApp orchestrator: wires all modules, runs pipeline
-├── config.py        # TOML config schema (dataclasses), load/save to ~/.talk/config.toml
+├── main.py          # Entry point + UnTypeApp orchestrator: wires all modules, runs pipeline
+├── config.py        # TOML config schema (dataclasses), load/save to ~/.untype/config.toml
 ├── hotkey.py        # Global push-to-talk hotkey listener (pynput), parse_hotkey() + HotkeyListener
 ├── clipboard.py     # Clipboard save/restore, grab_selected_text(), inject_text() via Ctrl+C/V sim
 ├── audio.py         # AudioRecorder (sounddevice InputStream), in-memory Float32, normalize_audio()
@@ -59,7 +59,7 @@ src/talk/
 3. Worker thread: `clipboard.py` saves current clipboard, sends Ctrl+C, checks for new text → determines mode
 4. Worker thread: `audio.py` starts recording while hotkey is held (Push-to-Talk)
 5. On hotkey release, pipeline thread waits for recording setup, then stops recording
-6. `audio.normalize_audio()` amplifies whispered speech with gain boost
+6. `audio.normalize_audio()` amplifies speech with gain boost
 7. `stt.py` transcribes buffer via API or local engine → text string
 8. `llm.py` builds prompt (mode-dependent), calls API → refined text
 9. `clipboard.py` `inject_text()` writes result to clipboard, simulates Ctrl+V, restores original clipboard
@@ -82,13 +82,13 @@ src/talk/
 
 ## Configuration
 
-Settings stored in `~/.talk/config.toml` (created with defaults on first run):
+Settings stored in `~/.untype/config.toml` (created with defaults on first run):
 
 | Section | Key | Default | Description |
 |---------|-----|---------|-------------|
 | `hotkey` | `trigger` | `f6` | Push-to-talk hotkey (single key or combo like `alt+space`) |
 | `audio` | `sample_rate` | `16000` | Recording sample rate (Hz) |
-| `audio` | `gain_boost` | `3.0` | Pre-STT gain multiplier for whispered speech |
+| `audio` | `gain_boost` | `3.0` | Pre-STT gain multiplier for quiet speech |
 | `audio` | `device` | `""` | Audio device (empty = system default) |
 | `stt` | `backend` | `api` | `api` (online) or `local` (faster-whisper) |
 | `stt` | `api_base_url` | `""` | OpenAI-compatible transcription API endpoint |
