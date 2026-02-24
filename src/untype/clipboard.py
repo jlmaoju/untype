@@ -111,3 +111,7 @@ def _release_all_modifiers() -> None:
             _keyboard.release(mod)
         except Exception:
             pass
+
+
+# Public alias for use by other modules (e.g. ghost menu revert/regenerate).
+release_all_modifiers = _release_all_modifiers

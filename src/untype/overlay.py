@@ -27,8 +27,9 @@ _CAPSULE_H = 36
 _CAPSULE_R = 18  # half height → pill ends
 
 # Capsule transparency range for alpha-breathing animation
-_CAPSULE_ALPHA_MIN = 0.55
-_CAPSULE_ALPHA_MAX = 0.85
+# Set both to 0.9 for a constant 90% opacity (no breathing effect)
+_CAPSULE_ALPHA_MIN = 0.9
+_CAPSULE_ALPHA_MAX = 0.9
 
 # Hold bubble dimensions
 _BUBBLE_W = 300
@@ -85,9 +86,19 @@ class CapsuleOverlay:
         self,
         on_hold_inject: Callable[[], None] | None = None,
         on_hold_copy: Callable[[], None] | None = None,
+        on_hold_ghost: Callable[[], None] | None = None,
+        on_cancel: Callable[[], None] | None = None,
+        on_ghost_revert: Callable[[], None] | None = None,
+        on_ghost_regenerate: Callable[[], None] | None = None,
+        on_ghost_use_raw: Callable[[], None] | None = None,
     ) -> None:
         self._on_hold_inject = on_hold_inject
         self._on_hold_copy = on_hold_copy
+        self._on_hold_ghost = on_hold_ghost
+        self._on_cancel = on_cancel
+        self._on_ghost_revert = on_ghost_revert
+        self._on_ghost_regenerate = on_ghost_regenerate
+        self._on_ghost_use_raw = on_ghost_use_raw
 
         self._queue: queue.Queue[tuple] = queue.Queue()
         self._thread: threading.Thread | None = None
@@ -134,6 +145,20 @@ class CapsuleOverlay:
         self._rec_persona_on_click: Callable[[int], None] | None = None
         self._rec_persona_bar_w: int = 0  # measured width for right-alignment
         self._rec_persona_bar_h: int = 0  # measured height for above-capsule placement
+
+        # Cancel button state
+        self._cancel_btn_id: int | None = None
+        self._cancel_hover: bool = False
+
+        # Ghost menu state
+        self._ghost_window: tk.Toplevel | None = None
+        self._ghost_expanded: bool = False
+        self._ghost_hover_timer: str | None = None
+        self._ghost_auto_dismiss_timer: str | None = None
+        self._ghost_x: int = 0
+        self._ghost_y: int = 0
+        self._ghost_kb_listener: object | None = None
+        self._ghost_mouse_listener: object | None = None
 
     # ------------------------------------------------------------------
     # Thread-safe public API (callable from any thread)
@@ -254,6 +279,18 @@ class CapsuleOverlay:
         self._queue.put(("REC_PERSONAS_HIDE",))
 
     # ------------------------------------------------------------------
+    # Ghost menu (thread-safe public API)
+    # ------------------------------------------------------------------
+
+    def show_ghost_menu(self, x: int, y: int) -> None:
+        """Show the ghost menu icon near the caret after text injection."""
+        self._queue.put(("GHOST_SHOW", x, y))
+
+    def hide_ghost_menu(self) -> None:
+        """Hide and destroy the ghost menu."""
+        self._queue.put(("GHOST_HIDE",))
+
+    # ------------------------------------------------------------------
     # Overlay thread internals
     # ------------------------------------------------------------------
 
@@ -312,8 +349,41 @@ class CapsuleOverlay:
             anchor="center",
         )
 
+        # Cancel "×" button (right edge, initially hidden).
+        self._cancel_btn_id = canvas.create_text(
+            _CAPSULE_W - 14, _CAPSULE_H // 2,
+            text="\u00d7", fill="#666666",
+            font=("Segoe UI", 13, "bold"),
+            anchor="center",
+            state="hidden",
+        )
+        canvas.tag_bind(self._cancel_btn_id, "<Button-1>", self._on_cancel_click)
+        canvas.tag_bind(
+            self._cancel_btn_id, "<Enter>",
+            lambda e: (
+                canvas.itemconfigure(self._cancel_btn_id, fill="#ff6666"),
+                setattr(self, "_cancel_hover", True),
+            ),
+        )
+        canvas.tag_bind(
+            self._cancel_btn_id, "<Leave>",
+            lambda e: (
+                canvas.itemconfigure(self._cancel_btn_id, fill="#666666"),
+                setattr(self, "_cancel_hover", False),
+            ),
+        )
+
         self._canvas = canvas
         self._capsule_window = win
+
+    def _on_cancel_click(self, event: object = None) -> None:
+        """Handle click on the capsule cancel button."""
+        if self._on_cancel is not None:
+            threading.Thread(
+                target=self._on_cancel,
+                name="untype-cancel",
+                daemon=True,
+            ).start()
 
     # ------------------------------------------------------------------
     # Queue polling
@@ -365,6 +435,11 @@ class CapsuleOverlay:
             self._do_select_recording_persona(index)
         elif op == "REC_PERSONAS_HIDE":
             self._do_hide_recording_personas()
+        elif op == "GHOST_SHOW":
+            _, x, y = cmd
+            self._do_show_ghost_menu(x, y)
+        elif op == "GHOST_HIDE":
+            self._do_hide_ghost_menu()
         elif op == "QUIT":
             self._do_quit()
 
@@ -409,6 +484,26 @@ class CapsuleOverlay:
         label = status.rstrip(".")
         canvas.itemconfigure(self._text_id, text=label)
 
+        # Show/hide cancel button based on pipeline status.
+        _CANCEL_STATUSES = (
+            "Recording...", "Transcribing...", "Processing...",
+        )
+        show_cancel = status in _CANCEL_STATUSES
+        if self._cancel_btn_id is not None:
+            if show_cancel:
+                canvas.itemconfigure(self._cancel_btn_id, state="normal")
+                # Shift main text slightly left to avoid overlap with X.
+                canvas.coords(
+                    self._text_id,
+                    (_CAPSULE_W - 28) // 2, _CAPSULE_H // 2,
+                )
+            else:
+                canvas.itemconfigure(self._cancel_btn_id, state="hidden")
+                canvas.coords(
+                    self._text_id,
+                    _CAPSULE_W // 2, _CAPSULE_H // 2,
+                )
+
         # Start/stop alpha-breathing animation.
         _ANIM_STATUSES = (
             "Recording...", "Transcribing...",
@@ -429,6 +524,9 @@ class CapsuleOverlay:
         self._animating = False
         self._flying = False
         self._capsule_at_corner = False
+        # Hide cancel button.
+        if self._cancel_btn_id is not None and self._canvas is not None:
+            self._canvas.itemconfigure(self._cancel_btn_id, state="hidden")
         win = self._capsule_window
         if win is not None:
             win.withdraw()
@@ -442,6 +540,7 @@ class CapsuleOverlay:
             self._do_hide_hold_bubble()
             self._do_hide_staging()
             self._do_hide_recording_personas()
+            self._do_hide_ghost_menu()
             # Unblock any pipeline thread waiting on staging.
             self._staging_result_action = "cancel"
             self._staging_event.set()
@@ -634,9 +733,14 @@ class CapsuleOverlay:
         canvas.coords(preview_id, _BUBBLE_W // 2, 4 + text_y)
 
         # Hint text.
+        hint_str = (
+            "\u5de6\u952e\u63d2\u5165 | "
+            "\u53f3\u952e\u590d\u5236 | "
+            "\u4e2d\u952e\u540e\u6094\u836f"
+        )
         canvas.create_text(
             _BUBBLE_W // 2, 4 + text_y + text_h + 4,
-            text="L-click: inject | R-click: copy",
+            text=hint_str,
             fill="#888888",
             font=("Segoe UI", 8),
             width=text_max_px, anchor="n",
@@ -656,6 +760,7 @@ class CapsuleOverlay:
 
         # Click handlers.
         canvas.bind("<Button-1>", lambda e: self._on_bubble_left_click())
+        canvas.bind("<Button-2>", lambda e: self._on_bubble_middle_click())
         canvas.bind("<Button-3>", lambda e: self._on_bubble_right_click())
 
         # Position near bottom-right of screen.
@@ -694,6 +799,15 @@ class CapsuleOverlay:
             threading.Thread(
                 target=self._on_hold_copy,
                 name="untype-hold-copy",
+                daemon=True,
+            ).start()
+
+    def _on_bubble_middle_click(self) -> None:
+        self._do_hide_hold_bubble()
+        if self._on_hold_ghost:
+            threading.Thread(
+                target=self._on_hold_ghost,
+                name="untype-hold-ghost",
                 daemon=True,
             ).start()
 
@@ -892,6 +1006,30 @@ class CapsuleOverlay:
         inner = tk.Frame(border, bg="#2a2a2a")
         inner.pack(fill="both", expand=True)
 
+        # Close "×" button (top-right corner).
+        close_btn = tk.Label(
+            inner,
+            text="\u00d7",
+            font=("Segoe UI", 12, "bold"),
+            bg="#2a2a2a",
+            fg="#666666",
+            cursor="hand2",
+            padx=4,
+        )
+        close_btn.place(relx=1.0, rely=0.0, anchor="ne", x=-2, y=2)
+        close_btn.bind(
+            "<Button-1>",
+            lambda e: self._resolve_staging("cancel"),
+        )
+        close_btn.bind(
+            "<Enter>",
+            lambda e: close_btn.configure(fg="#ff6666"),
+        )
+        close_btn.bind(
+            "<Leave>",
+            lambda e: close_btn.configure(fg="#666666"),
+        )
+
         # Editable text area.
         text_widget = tk.Text(
             inner,
@@ -1060,6 +1198,328 @@ class CapsuleOverlay:
                 pass
             self._staging_window = None
             self._staging_text_widget = None
+
+    # ------------------------------------------------------------------
+    # Ghost menu (post-injection undo/regenerate)
+    # ------------------------------------------------------------------
+
+    def _do_show_ghost_menu(self, x: int, y: int) -> None:
+        """Create the ghost menu icon near the caret."""
+        root = self._root
+        if root is None:
+            return
+
+        # Destroy any existing ghost menu.
+        self._do_hide_ghost_menu()
+
+        self._ghost_x = x
+        self._ghost_y = y
+
+        win = tk.Toplevel(root)
+        win.overrideredirect(True)
+        win.attributes("-topmost", True)
+        win.attributes("-alpha", 0.75)
+
+        try:
+            set_window_noactivate(win)
+        except Exception:
+            logger.debug("set_window_noactivate failed on ghost menu")
+
+        # Collapsed state: small icon button with thin white border.
+        border_frame = tk.Frame(win, bg="#555555", padx=1, pady=1)
+        border_frame.pack(fill="both", expand=True)
+
+        frame = tk.Frame(border_frame, bg="#2a2a2a")
+        frame.pack(fill="both", expand=True)
+
+        icon_label = tk.Label(
+            frame,
+            text="\u21a9",
+            font=("Segoe UI", 13),
+            bg="#2a2a2a",
+            fg="#888888",
+            cursor="hand2",
+            padx=4,
+            pady=2,
+        )
+        icon_label.pack()
+
+        # Menu frame (hidden initially, shown on hover).
+        menu_frame = tk.Frame(frame, bg="#2a2a2a")
+        # Not packed yet — expanded on hover.
+
+        # Menu buttons.
+        btn_use_raw = tk.Label(
+            menu_frame,
+            text=" \u539f\u6587\u66ff\u6362 Raw ",
+            font=("Segoe UI", 9),
+            bg="#3a3a3a",
+            fg="#c0c0c0",
+            cursor="hand2",
+            padx=4,
+            pady=3,
+        )
+        btn_use_raw.pack(fill="x", padx=2, pady=(2, 1))
+        btn_use_raw.bind(
+            "<Button-1>",
+            lambda e: self._on_ghost_action("use_raw"),
+        )
+        btn_use_raw.bind(
+            "<Enter>", lambda e: btn_use_raw.configure(bg="#4a4a4a", fg="#ffffff"),
+        )
+        btn_use_raw.bind(
+            "<Leave>", lambda e: btn_use_raw.configure(bg="#3a3a3a", fg="#c0c0c0"),
+        )
+
+        btn_regen = tk.Label(
+            menu_frame,
+            text=" \u91cd\u65b0\u751f\u6210 Redo ",
+            font=("Segoe UI", 9),
+            bg="#3a3a3a",
+            fg="#c0c0c0",
+            cursor="hand2",
+            padx=4,
+            pady=3,
+        )
+        btn_regen.pack(fill="x", padx=2, pady=(1, 1))
+        btn_regen.bind(
+            "<Button-1>",
+            lambda e: self._on_ghost_action("regenerate"),
+        )
+        btn_regen.bind(
+            "<Enter>", lambda e: btn_regen.configure(bg="#4a4a4a", fg="#ffffff"),
+        )
+        btn_regen.bind(
+            "<Leave>", lambda e: btn_regen.configure(bg="#3a3a3a", fg="#c0c0c0"),
+        )
+
+        btn_revert = tk.Label(
+            menu_frame,
+            text=" \u64a4\u56de\u7f16\u8f91 Edit ",
+            font=("Segoe UI", 9),
+            bg="#3a3a3a",
+            fg="#c0c0c0",
+            cursor="hand2",
+            padx=4,
+            pady=3,
+        )
+        btn_revert.pack(fill="x", padx=2, pady=(1, 1))
+        btn_revert.bind(
+            "<Button-1>",
+            lambda e: self._on_ghost_action("revert"),
+        )
+        btn_revert.bind(
+            "<Enter>", lambda e: btn_revert.configure(bg="#4a4a4a", fg="#ffffff"),
+        )
+        btn_revert.bind(
+            "<Leave>", lambda e: btn_revert.configure(bg="#3a3a3a", fg="#c0c0c0"),
+        )
+
+        btn_dismiss = tk.Label(
+            menu_frame,
+            text=" \u00d7 \u5173\u95ed ",
+            font=("Segoe UI", 9),
+            bg="#3a3a3a",
+            fg="#c0c0c0",
+            cursor="hand2",
+            padx=4,
+            pady=3,
+        )
+        btn_dismiss.pack(fill="x", padx=2, pady=(1, 2))
+        btn_dismiss.bind(
+            "<Button-1>",
+            lambda e: self._do_hide_ghost_menu(),
+        )
+        btn_dismiss.bind(
+            "<Enter>", lambda e: btn_dismiss.configure(bg="#4a4a4a", fg="#ff6666"),
+        )
+        btn_dismiss.bind(
+            "<Leave>", lambda e: btn_dismiss.configure(bg="#3a3a3a", fg="#c0c0c0"),
+        )
+
+        self._ghost_expanded = False
+        self._ghost_menu_frame = menu_frame
+
+        # Hover to expand/collapse — bind on all widgets.
+        all_hover_widgets = (
+            win, border_frame, frame, icon_label,
+            menu_frame, btn_use_raw, btn_regen, btn_revert, btn_dismiss,
+        )
+        for widget in all_hover_widgets:
+            widget.bind("<Enter>", self._on_ghost_enter)
+            widget.bind("<Leave>", self._on_ghost_leave)
+
+        # Position: offset right and above the caret.
+        px = x + 16
+        py = y - 32
+
+        # Keep on-screen.
+        screen_w = win.winfo_screenwidth()
+        if px + 28 > screen_w:
+            px = x - 40
+        if py < 0:
+            py = y + 16
+
+        win.geometry(f"+{px}+{py}")
+        win.deiconify()
+        win.lift()
+
+        self._ghost_window = win
+
+        # Auto-dismiss safety net: 30 seconds.
+        self._ghost_auto_dismiss_timer = win.after(
+            30_000, self._do_hide_ghost_menu,
+        )
+
+        # Start keyboard/mouse listeners to dismiss on any user activity.
+        self._start_ghost_dismiss_listeners()
+
+    def _on_ghost_enter(self, event: object = None) -> None:
+        """Mouse entered the ghost area — expand menu."""
+        # Cancel any pending collapse timer.
+        if self._ghost_hover_timer is not None and self._ghost_window is not None:
+            try:
+                self._ghost_window.after_cancel(self._ghost_hover_timer)
+            except Exception:
+                pass
+            self._ghost_hover_timer = None
+
+        if not self._ghost_expanded and self._ghost_window is not None:
+            self._ghost_expanded = True
+            self._ghost_menu_frame.pack(fill="x")
+            self._ghost_window.attributes("-alpha", 0.92)
+
+    def _on_ghost_leave(self, event: object = None) -> None:
+        """Mouse left the ghost area — schedule collapse after delay.
+
+        Uses a generous delay to avoid flicker when moving between child
+        widgets (each widget fires Leave→Enter on the sibling).
+        """
+        if self._ghost_window is not None:
+            # Cancel any previous timer.
+            if self._ghost_hover_timer is not None:
+                try:
+                    self._ghost_window.after_cancel(self._ghost_hover_timer)
+                except Exception:
+                    pass
+            self._ghost_hover_timer = self._ghost_window.after(
+                500, self._ghost_collapse,
+            )
+
+    def _ghost_collapse(self) -> None:
+        """Collapse the ghost menu back to the icon."""
+        self._ghost_hover_timer = None
+        if self._ghost_expanded and self._ghost_window is not None:
+            self._ghost_expanded = False
+            self._ghost_menu_frame.pack_forget()
+            self._ghost_window.attributes("-alpha", 0.75)
+
+    def _on_ghost_action(self, action: str) -> None:
+        """Handle a ghost menu button click."""
+        self._do_hide_ghost_menu()
+        if action == "use_raw" and self._on_ghost_use_raw is not None:
+            threading.Thread(
+                target=self._on_ghost_use_raw,
+                name="untype-ghost-raw",
+                daemon=True,
+            ).start()
+        elif action == "revert" and self._on_ghost_revert is not None:
+            threading.Thread(
+                target=self._on_ghost_revert,
+                name="untype-ghost-revert",
+                daemon=True,
+            ).start()
+        elif action == "regenerate" and self._on_ghost_regenerate is not None:
+            threading.Thread(
+                target=self._on_ghost_regenerate,
+                name="untype-ghost-regen",
+                daemon=True,
+            ).start()
+
+    def _do_hide_ghost_menu(self) -> None:
+        """Destroy the ghost menu window and cancel timers/listeners."""
+        self._stop_ghost_dismiss_listeners()
+        if self._ghost_hover_timer is not None and self._ghost_window is not None:
+            try:
+                self._ghost_window.after_cancel(self._ghost_hover_timer)
+            except Exception:
+                pass
+            self._ghost_hover_timer = None
+        if self._ghost_auto_dismiss_timer is not None and self._ghost_window is not None:
+            try:
+                self._ghost_window.after_cancel(self._ghost_auto_dismiss_timer)
+            except Exception:
+                pass
+            self._ghost_auto_dismiss_timer = None
+        if self._ghost_window is not None:
+            try:
+                self._ghost_window.destroy()
+            except Exception:
+                pass
+            self._ghost_window = None
+            self._ghost_expanded = False
+
+    # ------------------------------------------------------------------
+    # Ghost dismiss listeners (keyboard/mouse activity detection)
+    # ------------------------------------------------------------------
+
+    def _start_ghost_dismiss_listeners(self) -> None:
+        """Install temporary pynput listeners to dismiss ghost on user input."""
+        from pynput import keyboard as kb
+        from pynput import mouse as ms
+
+        def on_key_press(key: object) -> bool:
+            # Any keypress dismisses the ghost.
+            self._queue.put(("GHOST_HIDE",))
+            return False  # stop listener
+
+        def on_mouse_click(
+            x: int, y: int, button: object, pressed: bool,
+        ) -> bool:
+            if not pressed:
+                return True  # ignore release
+            # Check if the click is inside the ghost window area.
+            # If so, let the ghost handle it (don't dismiss).
+            win = self._ghost_window
+            if win is not None:
+                try:
+                    wx = win.winfo_x()
+                    wy = win.winfo_y()
+                    ww = win.winfo_width()
+                    wh = win.winfo_height()
+                    # Generous padding to account for expanded menu.
+                    if wx - 10 <= x <= wx + ww + 10 and wy - 10 <= y <= wy + wh + 80:
+                        return True  # click on ghost — keep listening
+                except Exception:
+                    pass
+            # Click outside ghost — dismiss.
+            self._queue.put(("GHOST_HIDE",))
+            return False  # stop listener
+
+        kb_listener = kb.Listener(on_press=on_key_press)
+        kb_listener.daemon = True
+        kb_listener.start()
+        self._ghost_kb_listener = kb_listener
+
+        ms_listener = ms.Listener(on_click=on_mouse_click)
+        ms_listener.daemon = True
+        ms_listener.start()
+        self._ghost_mouse_listener = ms_listener
+
+    def _stop_ghost_dismiss_listeners(self) -> None:
+        """Stop the temporary keyboard/mouse dismiss listeners."""
+        if self._ghost_kb_listener is not None:
+            try:
+                self._ghost_kb_listener.stop()
+            except Exception:
+                pass
+            self._ghost_kb_listener = None
+        if self._ghost_mouse_listener is not None:
+            try:
+                self._ghost_mouse_listener.stop()
+            except Exception:
+                pass
+            self._ghost_mouse_listener = None
 
     # ------------------------------------------------------------------
     # Breathing animation (alpha pulse)

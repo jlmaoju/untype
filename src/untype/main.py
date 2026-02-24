@@ -10,7 +10,7 @@ import time
 import pyperclip
 
 from untype.audio import AudioRecorder, normalize_audio
-from untype.clipboard import grab_selected_text, inject_text
+from untype.clipboard import grab_selected_text, inject_text, release_all_modifiers
 from untype.config import AppConfig, Persona, load_config, load_personas, save_config
 from untype.hotkey import HotkeyListener
 from untype.llm import LLMClient
@@ -71,6 +71,19 @@ class UnTypeApp:
         # Signalled once the press-setup thread finishes (recording started or error)
         self._recording_started = threading.Event()
         self._recording_started.set()  # initially "done"
+        # Emergency stop: set to abort the pipeline at the next checkpoint.
+        self._cancel_requested = threading.Event()
+
+        # -- Last interaction state (for ghost menu revert/regenerate) ------
+        self._last_raw_text: str | None = None
+        self._last_result: str | None = None
+        self._last_persona: Persona | None = None
+        self._last_mode: str | None = None
+        self._last_selected_text: str | None = None
+        self._last_original_clipboard: str | None = None
+        self._last_target_window: WindowIdentity | None = None
+        self._last_caret_x: int = 0
+        self._last_caret_y: int = 0
 
         # -- Initialise subsystems -------------------------------------------
         logger.info("Initialising audio recorder...")
@@ -102,6 +115,11 @@ class UnTypeApp:
         self._overlay = CapsuleOverlay(
             on_hold_inject=self._on_hold_inject,
             on_hold_copy=self._on_hold_copy,
+            on_hold_ghost=self._on_hold_ghost,
+            on_cancel=self._on_cancel,
+            on_ghost_revert=self._on_ghost_revert,
+            on_ghost_regenerate=self._on_ghost_regenerate,
+            on_ghost_use_raw=self._on_ghost_use_raw,
         )
 
         logger.info("Initialising digit key interceptor...")
@@ -153,6 +171,11 @@ class UnTypeApp:
             logger.warning("Pipeline already running — ignoring hotkey press")
             return
 
+        self._cancel_requested.clear()
+
+        # Dismiss any existing ghost menu from a previous interaction.
+        self._overlay.hide_ghost_menu()
+
         # Safety net: if there's a held result from a previous HWND mismatch,
         # copy it to clipboard before discarding so the user doesn't lose it.
         if self._held_result is not None:
@@ -187,6 +210,45 @@ class UnTypeApp:
             name="untype-pipeline",
             daemon=True,
         ).start()
+
+    # ------------------------------------------------------------------
+    # Emergency stop
+    # ------------------------------------------------------------------
+
+    def _on_cancel(self) -> None:
+        """Called from the overlay thread when the user clicks the cancel button."""
+        logger.info("Cancel requested by user")
+        self._cancel_requested.set()
+
+        # Reset hotkey toggle state so next F6 starts a fresh recording.
+        self._hotkey.reset_toggle()
+        self._press_active = False
+
+        # Stop recorder if currently recording.
+        if self._recorder.is_recording:
+            try:
+                self._recorder.stop()
+            except Exception:
+                pass
+
+        # Deactivate digit interceptor.
+        self._digit_interceptor.set_active(False)
+
+        # Stop HWND watcher.
+        self._hwnd_watch_active = False
+
+        # Hide all overlays.
+        self._overlay.hide()
+        self._overlay.hide_recording_personas()
+        self._overlay.hide_hold_bubble()
+
+        # Force-unblock staging if it's waiting.
+        self._overlay._staging_result_action = "cancel"
+        self._overlay._staging_result_text = ""
+        self._overlay._staging_event.set()
+
+        # Update tray status.
+        self._tray.update_status("Ready")
 
     # ------------------------------------------------------------------
     # Recording start (runs on a worker thread, NOT the hook thread)
@@ -277,6 +339,11 @@ class UnTypeApp:
             # Wait for the recording-start thread to finish its work.
             self._recording_started.wait(timeout=10.0)
 
+            # Checkpoint: cancel requested during recording start?
+            if self._cancel_requested.is_set():
+                logger.info("Pipeline cancelled after recording start")
+                return
+
             if not self._recorder.is_recording:
                 logger.warning("Recording not active — aborting pipeline")
                 self._digit_interceptor.set_active(False)
@@ -288,6 +355,11 @@ class UnTypeApp:
             # 1. Stop recording and retrieve audio.
             logger.info("Stopping audio recording...")
             audio = self._recorder.stop()
+
+            # Checkpoint: cancel requested during recording stop?
+            if self._cancel_requested.is_set():
+                logger.info("Pipeline cancelled after recording stop")
+                return
 
             if audio.size == 0:
                 logger.warning("Empty audio buffer — aborting pipeline")
@@ -307,6 +379,11 @@ class UnTypeApp:
             logger.info("Transcribing audio...")
             text = self._stt.transcribe(audio)
             text = text.strip()
+
+            # Checkpoint: cancel requested during transcription?
+            if self._cancel_requested.is_set():
+                logger.info("Pipeline cancelled after transcription")
+                return
 
             if not text:
                 logger.warning("Empty transcription — aborting pipeline")
@@ -342,6 +419,7 @@ class UnTypeApp:
         finally:
             self._hwnd_watch_active = False
             self._digit_interceptor.set_active(False)
+            self._cancel_requested.clear()
             self._pipeline_lock.release()
 
     def _run_llm(self, transcribed_text: str, persona: Persona | None = None) -> str:
@@ -405,14 +483,20 @@ class UnTypeApp:
             # mismatch — just update its status text in place.
             self._overlay.update_status("Processing...")
         else:
-            caret = get_caret_screen_position()
-            self._overlay.show(caret.x, caret.y, "Processing...")
+            self._overlay.show(self._caret_x, self._caret_y, "Processing...")
         self._tray.update_status("Processing...")
 
         # Restart HWND monitoring during the LLM call.
         self._start_hwnd_watcher()
 
         result = self._run_llm(text, persona=persona)
+
+        # Checkpoint: cancel requested during LLM call?
+        if self._cancel_requested.is_set():
+            logger.info("Pipeline cancelled after LLM (fast-lane)")
+            self._overlay.hide()
+            self._tray.update_status("Ready")
+            return
 
         # Stop watcher and verify window before injection.
         self._hwnd_watch_active = False
@@ -422,6 +506,7 @@ class UnTypeApp:
             logger.warning(
                 "Window changed during LLM processing — holding result",
             )
+            self._save_interaction_state(text, result, persona=persona, show_ghost=False)
             self._held_result = result
             self._held_clipboard = self._original_clipboard
             self._overlay.fly_to_hold_bubble(result)
@@ -430,6 +515,7 @@ class UnTypeApp:
 
         logger.info("Injecting refined text (%d chars)", len(result))
         inject_text(result, self._original_clipboard)
+        self._save_interaction_state(text, result, persona=persona)
         self._overlay.hide()
         self._tray.update_status("Ready")
         logger.info("Pipeline complete (fast-lane)")
@@ -456,23 +542,35 @@ class UnTypeApp:
             logger.info("Staging cancelled by user")
             return
 
+        # Checkpoint: cancel requested while staging was open?
+        if self._cancel_requested.is_set():
+            logger.info("Pipeline cancelled during staging")
+            return
+
         # Brief delay for focus to return to the previous window.
         time.sleep(0.15)
 
         if action == "raw":
             logger.info("Injecting raw text (%d chars)", len(edited_text))
             inject_text(edited_text, self._original_clipboard)
+            self._save_interaction_state(text, edited_text)
             return
 
         # action == "refine" — send through LLM.
-        caret = get_caret_screen_position()
-        self._overlay.show(caret.x, caret.y, "Processing...")
+        self._overlay.show(self._caret_x, self._caret_y, "Processing...")
         self._tray.update_status("Processing...")
 
         # Restart HWND monitoring during the LLM call.
         self._start_hwnd_watcher()
 
         result = self._run_llm(edited_text)
+
+        # Checkpoint: cancel requested during LLM call?
+        if self._cancel_requested.is_set():
+            logger.info("Pipeline cancelled after LLM (staging)")
+            self._overlay.hide()
+            self._tray.update_status("Ready")
+            return
 
         # Stop watcher and verify window before injection.
         self._hwnd_watch_active = False
@@ -482,6 +580,7 @@ class UnTypeApp:
             logger.warning(
                 "Window changed during LLM processing — holding result",
             )
+            self._save_interaction_state(text, result, show_ghost=False)
             self._held_result = result
             self._held_clipboard = self._original_clipboard
             self._overlay.fly_to_hold_bubble(result)
@@ -490,6 +589,7 @@ class UnTypeApp:
 
         logger.info("Injecting refined text (%d chars)", len(result))
         inject_text(result, self._original_clipboard)
+        self._save_interaction_state(text, result)
         self._overlay.hide()
         self._tray.update_status("Ready")
         logger.info("Pipeline complete")
@@ -543,6 +643,15 @@ class UnTypeApp:
         logger.info("Hold-inject: injecting %d chars into current window", len(result))
         inject_text(result, clipboard)
 
+        # Show ghost menu if we have saved interaction state.
+        if self._last_raw_text is not None:
+            self._last_result = result
+            caret = get_caret_screen_position()
+            self._last_caret_x = caret.x
+            self._last_caret_y = caret.y
+            self._last_target_window = get_foreground_window()
+            self._overlay.show_ghost_menu(caret.x, caret.y)
+
     def _on_hold_copy(self) -> None:
         """Right-click on hold bubble — copy held text to clipboard."""
         result = self._held_result
@@ -557,6 +666,287 @@ class UnTypeApp:
             pyperclip.copy(result)
         except Exception:
             logger.exception("Failed to copy held result to clipboard")
+
+    def _on_hold_ghost(self) -> None:
+        """Middle-click on hold bubble — show ghost menu for revert/regenerate.
+
+        Does NOT inject text.  The held result is discarded (the ghost
+        menu actions will use ``_last_*`` state instead).
+        """
+        self._held_result = None
+        self._held_clipboard = None
+
+        if self._last_raw_text is None:
+            logger.warning("Hold-ghost: no interaction state saved")
+            return
+
+        logger.info("Hold-ghost: showing ghost menu")
+        caret = get_caret_screen_position()
+        self._overlay.show_ghost_menu(caret.x, caret.y)
+
+    # ------------------------------------------------------------------
+    # Ghost menu callbacks (post-injection revert/regenerate)
+    # ------------------------------------------------------------------
+
+    def _save_interaction_state(
+        self,
+        raw_text: str,
+        result: str,
+        persona: Persona | None = None,
+        show_ghost: bool = True,
+    ) -> None:
+        """Capture the current interaction state for ghost menu revert/regenerate.
+
+        When *show_ghost* is True (default), the ghost menu icon is shown
+        near the caret.  Set to False when diverting to the hold bubble
+        (ghost will be shown after hold-inject instead).
+        """
+        self._last_raw_text = raw_text
+        self._last_result = result
+        self._last_persona = persona
+        self._last_mode = self._mode
+        self._last_selected_text = self._selected_text
+        self._last_original_clipboard = self._original_clipboard
+        self._last_target_window = self._target_window
+
+        caret = get_caret_screen_position()
+        self._last_caret_x = caret.x
+        self._last_caret_y = caret.y
+
+        if show_ghost:
+            self._overlay.show_ghost_menu(caret.x, caret.y)
+
+    def _simulate_undo(self) -> None:
+        """Send Ctrl+Z to undo the last paste in the target app."""
+        from pynput.keyboard import Controller, Key
+
+        kbd = Controller()
+        release_all_modifiers()
+        time.sleep(0.05)
+        kbd.press(Key.ctrl_l)
+        time.sleep(0.05)
+        kbd.press("z")
+        time.sleep(0.02)
+        kbd.release("z")
+        time.sleep(0.02)
+        kbd.release(Key.ctrl_l)
+        time.sleep(0.1)
+
+    def _on_ghost_revert(self) -> None:
+        """Ghost menu 'Revert' — undo paste, reopen staging with raw text."""
+        raw_text = self._last_raw_text
+        if raw_text is None:
+            logger.warning("Ghost revert: no interaction state saved")
+            return
+
+        if not self._pipeline_lock.acquire(blocking=False):
+            logger.warning("Ghost revert: pipeline busy — ignoring")
+            return
+
+        try:
+            # Undo the paste if the target window is still in foreground.
+            target = self._last_target_window
+            if target is not None and verify_foreground_window(target):
+                logger.info("Ghost revert: undoing paste via Ctrl+Z")
+                self._simulate_undo()
+            else:
+                logger.info("Ghost revert: target window not in foreground, skipping undo")
+
+            # Restore interaction context for the staging area.
+            self._mode = self._last_mode or "insert"
+            self._selected_text = self._last_selected_text
+            self._original_clipboard = self._last_original_clipboard
+            self._target_window = target
+            self._caret_x = self._last_caret_x
+            self._caret_y = self._last_caret_y
+            self._window_mismatch = False
+
+            # Build persona list for staging (if available).
+            personas_arg = None
+            if self._personas:
+                personas_arg = [(p.id, p.icon, p.name) for p in self._personas]
+
+            # Clear last state before re-entering staging.
+            self._last_raw_text = None
+            self._last_result = None
+
+            # Show staging area with the raw text.
+            self._overlay.show_staging(
+                raw_text,
+                self._caret_x,
+                self._caret_y,
+                personas=personas_arg,
+            )
+
+            # Block until user acts.
+            edited_text, action = self._overlay.wait_staging()
+
+            if action == "cancel":
+                logger.info("Ghost revert staging: cancelled")
+                return
+
+            time.sleep(0.15)
+
+            persona = None
+            if action.startswith("persona:"):
+                pid = action.split(":", 1)[1]
+                persona = next(
+                    (p for p in self._personas if p.id == pid), None,
+                )
+                action = "refine"
+
+            if action == "raw":
+                logger.info("Ghost revert: injecting raw text (%d chars)", len(edited_text))
+                inject_text(edited_text, self._original_clipboard)
+                self._save_interaction_state(raw_text, edited_text)
+                return
+
+            # action == "refine"
+            self._overlay.show(self._caret_x, self._caret_y, "Processing...")
+            self._tray.update_status("Processing...")
+
+            # Start HWND monitoring during LLM call.
+            self._start_hwnd_watcher()
+
+            result = self._run_llm(edited_text, persona=persona)
+
+            # Stop watcher and verify window before injection.
+            self._hwnd_watch_active = False
+            if self._target_window is not None and (
+                self._window_mismatch
+                or not verify_foreground_window(self._target_window)
+            ):
+                logger.warning(
+                    "Ghost revert: window changed during LLM — holding result",
+                )
+                self._save_interaction_state(
+                    raw_text, result, persona=persona, show_ghost=False,
+                )
+                self._held_result = result
+                self._held_clipboard = self._original_clipboard
+                self._overlay.fly_to_hold_bubble(result)
+                self._tray.update_status("Ready")
+                return
+
+            logger.info("Ghost revert: injecting refined text (%d chars)", len(result))
+            inject_text(result, self._original_clipboard)
+            self._save_interaction_state(raw_text, result, persona=persona)
+            self._overlay.hide()
+            self._tray.update_status("Ready")
+
+        except Exception:
+            logger.exception("Ghost revert error")
+            self._hwnd_watch_active = False
+            self._overlay.hide()
+            self._tray.update_status("Ready")
+        finally:
+            self._hwnd_watch_active = False
+            self._pipeline_lock.release()
+
+    def _on_ghost_regenerate(self) -> None:
+        """Ghost menu 'Regenerate' — undo paste, re-run LLM, inject new result."""
+        raw_text = self._last_raw_text
+        persona = self._last_persona
+        if raw_text is None:
+            logger.warning("Ghost regenerate: no interaction state saved")
+            return
+
+        if not self._pipeline_lock.acquire(blocking=False):
+            logger.warning("Ghost regenerate: pipeline busy — ignoring")
+            return
+
+        try:
+            # Undo the paste if the target window is still in foreground.
+            target = self._last_target_window
+            if target is not None and verify_foreground_window(target):
+                logger.info("Ghost regenerate: undoing paste via Ctrl+Z")
+                self._simulate_undo()
+            else:
+                logger.info("Ghost regenerate: target window not in foreground, skipping undo")
+
+            # Restore interaction context.
+            self._mode = self._last_mode or "insert"
+            self._selected_text = self._last_selected_text
+            self._original_clipboard = self._last_original_clipboard
+            self._target_window = target
+            self._caret_x = self._last_caret_x
+            self._caret_y = self._last_caret_y
+            self._window_mismatch = False
+
+            # Show capsule with processing status.
+            self._overlay.show(self._caret_x, self._caret_y, "Processing...")
+            self._tray.update_status("Processing...")
+
+            # Start HWND monitoring during LLM call.
+            self._start_hwnd_watcher()
+
+            result = self._run_llm(raw_text, persona=persona)
+
+            # Stop watcher and verify window before injection.
+            self._hwnd_watch_active = False
+            if self._target_window is not None and (
+                self._window_mismatch
+                or not verify_foreground_window(self._target_window)
+            ):
+                logger.warning(
+                    "Ghost regenerate: window changed during LLM — holding result",
+                )
+                self._save_interaction_state(
+                    raw_text, result, persona=persona, show_ghost=False,
+                )
+                self._held_result = result
+                self._held_clipboard = self._original_clipboard
+                self._overlay.fly_to_hold_bubble(result)
+                self._tray.update_status("Ready")
+                return
+
+            logger.info("Ghost regenerate: injecting refined text (%d chars)", len(result))
+            inject_text(result, self._original_clipboard)
+            self._save_interaction_state(raw_text, result, persona=persona)
+            self._overlay.hide()
+            self._tray.update_status("Ready")
+
+        except Exception:
+            logger.exception("Ghost regenerate error")
+            self._hwnd_watch_active = False
+            self._overlay.hide()
+            self._tray.update_status("Ready")
+        finally:
+            self._hwnd_watch_active = False
+            self._pipeline_lock.release()
+
+    def _on_ghost_use_raw(self) -> None:
+        """Ghost menu 'Use Raw' — undo paste, inject raw STT text instead."""
+        raw_text = self._last_raw_text
+        if raw_text is None:
+            logger.warning("Ghost use-raw: no interaction state saved")
+            return
+
+        if not self._pipeline_lock.acquire(blocking=False):
+            logger.warning("Ghost use-raw: pipeline busy — ignoring")
+            return
+
+        try:
+            # Undo the paste if the target window is still in foreground.
+            target = self._last_target_window
+            if target is not None and verify_foreground_window(target):
+                logger.info("Ghost use-raw: undoing paste via Ctrl+Z")
+                self._simulate_undo()
+            else:
+                logger.info("Ghost use-raw: target window not in foreground, skipping undo")
+
+            # Restore context.
+            self._original_clipboard = self._last_original_clipboard
+            self._target_window = target
+
+            logger.info("Ghost use-raw: injecting raw text (%d chars)", len(raw_text))
+            inject_text(raw_text, self._original_clipboard)
+            self._save_interaction_state(raw_text, raw_text)
+
+        except Exception:
+            logger.exception("Ghost use-raw error")
+        finally:
+            self._pipeline_lock.release()
 
     # ------------------------------------------------------------------
     # Recording persona callbacks

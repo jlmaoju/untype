@@ -177,6 +177,17 @@ class HotkeyListener:
             self._active = False
             self._toggled_on = False
 
+    def reset_toggle(self) -> None:
+        """Reset the toggle state so the next press is treated as a new start.
+
+        Call this when the pipeline is cancelled externally (e.g. by the
+        emergency stop button) so that the HotkeyListener doesn't think
+        it's still in the "toggled on" state.
+        """
+        with self._lock:
+            self._toggled_on = False
+            self._active = False
+
     # ------------------------------------------------------------------
     # Internal key handlers
     # ------------------------------------------------------------------
