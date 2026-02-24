@@ -87,6 +87,7 @@ class UnTypeApp:
             self._config.hotkey.trigger,
             on_press=self._on_hotkey_press,
             on_release=self._on_hotkey_release,
+            mode=self._config.hotkey.mode,
         )
 
         logger.info("Initialising system tray...")
@@ -94,6 +95,7 @@ class UnTypeApp:
             config=self._config,
             on_settings_changed=self._on_settings_changed,
             on_quit=self._on_quit,
+            on_personas_changed=self._on_personas_changed,
         )
 
         logger.info("Initialising overlay...")
@@ -122,7 +124,12 @@ class UnTypeApp:
         self._hotkey.start()
         self._overlay.start()
         self._digit_interceptor.start()
-        logger.info("UnType is ready.  Hold %s to speak.", self._config.hotkey.trigger)
+        mode_hint = (
+            "Press %s to start/stop recording."
+            if self._config.hotkey.mode == "toggle"
+            else "Hold %s to speak."
+        )
+        logger.info("UnType is ready.  " + mode_hint, self._config.hotkey.trigger)
         self._tray.update_status("Ready")
 
         # tray.run() blocks until the user selects Quit.
@@ -161,7 +168,9 @@ class UnTypeApp:
         self._press_active = True
         self._recording_started.clear()
         threading.Thread(
-            target=self._start_recording, name="untype-rec-start", daemon=True,
+            target=self._start_recording,
+            name="untype-rec-start",
+            daemon=True,
         ).start()
 
     def _on_hotkey_release(self) -> None:
@@ -174,7 +183,9 @@ class UnTypeApp:
             return
         self._press_active = False
         threading.Thread(
-            target=self._process_pipeline, name="untype-pipeline", daemon=True,
+            target=self._process_pipeline,
+            name="untype-pipeline",
+            daemon=True,
         ).start()
 
     # ------------------------------------------------------------------
@@ -210,7 +221,9 @@ class UnTypeApp:
             self._caret_y = caret.y
             logger.info(
                 "Caret position: (%d, %d) found=%s",
-                caret.x, caret.y, caret.found,
+                caret.x,
+                caret.y,
+                caret.found,
             )
 
             # Start recording FIRST so the user's speech is captured from
@@ -359,7 +372,9 @@ class UnTypeApp:
             if self._mode == "polish":
                 logger.info("Polishing selected text with LLM...")
                 return self._llm.polish(
-                    self._selected_text or "", transcribed_text, **overrides,
+                    self._selected_text or "",
+                    transcribed_text,
+                    **overrides,
                 )
             else:
                 logger.info("Inserting text via LLM...")
@@ -385,10 +400,13 @@ class UnTypeApp:
         self._hwnd_watch_active = False
         at_corner = self._window_mismatch
 
-        caret = get_caret_screen_position()
-        cx = caret.x if not at_corner else 0
-        cy = caret.y if not at_corner else 0
-        self._overlay.show(cx, cy, "Processing...")
+        if at_corner:
+            # Capsule is already parked at the corner from a prior HWND
+            # mismatch — just update its status text in place.
+            self._overlay.update_status("Processing...")
+        else:
+            caret = get_caret_screen_position()
+            self._overlay.show(caret.x, caret.y, "Processing...")
         self._tray.update_status("Processing...")
 
         # Restart HWND monitoring during the LLM call.
@@ -399,8 +417,7 @@ class UnTypeApp:
         # Stop watcher and verify window before injection.
         self._hwnd_watch_active = False
         if self._target_window is not None and (
-            self._window_mismatch
-            or not verify_foreground_window(self._target_window)
+            self._window_mismatch or not verify_foreground_window(self._target_window)
         ):
             logger.warning(
                 "Window changed during LLM processing — holding result",
@@ -427,7 +444,9 @@ class UnTypeApp:
             self._overlay.show_staging(text, 0, 0, at_corner=True)
         else:
             self._overlay.show_staging(
-                text, self._caret_x, self._caret_y,
+                text,
+                self._caret_x,
+                self._caret_y,
             )
 
         # Block until the user acts (Enter / Shift+Enter / Esc).
@@ -458,8 +477,7 @@ class UnTypeApp:
         # Stop watcher and verify window before injection.
         self._hwnd_watch_active = False
         if self._target_window is not None and (
-            self._window_mismatch
-            or not verify_foreground_window(self._target_window)
+            self._window_mismatch or not verify_foreground_window(self._target_window)
         ):
             logger.warning(
                 "Window changed during LLM processing — holding result",
@@ -501,8 +519,7 @@ class UnTypeApp:
             ):
                 self._window_mismatch = True
                 logger.info(
-                    "Window switch detected during pipeline "
-                    "(expected HWND=%d, title=%r)",
+                    "Window switch detected during pipeline (expected HWND=%d, title=%r)",
                     self._target_window.hwnd,
                     self._target_window.title,
                 )
@@ -575,17 +592,23 @@ class UnTypeApp:
         save_config(new_config)
 
         # --- Hotkey ---
-        if new_config.hotkey.trigger != old.hotkey.trigger:
+        if (
+            new_config.hotkey.trigger != old.hotkey.trigger
+            or new_config.hotkey.mode != old.hotkey.mode
+        ):
             logger.info(
-                "Hotkey changed from %r to %r — restarting listener",
+                "Hotkey changed (trigger=%r→%r, mode=%r→%r) — restarting listener",
                 old.hotkey.trigger,
                 new_config.hotkey.trigger,
+                old.hotkey.mode,
+                new_config.hotkey.mode,
             )
             self._hotkey.stop()
             self._hotkey = HotkeyListener(
                 new_config.hotkey.trigger,
                 on_press=self._on_hotkey_press,
                 on_release=self._on_hotkey_release,
+                mode=new_config.hotkey.mode,
             )
             self._hotkey.start()
 
@@ -635,6 +658,11 @@ class UnTypeApp:
         logger.info("Reloaded %d persona(s)", len(self._personas))
 
         logger.info("Settings update complete")
+
+    def _on_personas_changed(self) -> None:
+        """Handle persona changes pushed from the persona manager dialog."""
+        self._personas = load_personas()
+        logger.info("Reloaded %d persona(s) from persona manager", len(self._personas))
 
     # ------------------------------------------------------------------
     # Quit

@@ -111,10 +111,13 @@ def parse_hotkey(hotkey_str: str) -> tuple[set[str], keyboard.KeyCode | keyboard
 
 
 class HotkeyListener:
-    """Global push-to-talk hotkey listener.
+    """Global hotkey listener supporting push-to-talk and toggle modes.
 
-    Detects when a hotkey combo is fully pressed and calls *on_press*.
-    When any part of the combo is subsequently released, calls *on_release*.
+    In **hold** mode (push-to-talk): pressing the hotkey calls *on_press*,
+    releasing it calls *on_release*.
+
+    In **toggle** mode: the first press calls *on_press*, the second press
+    calls *on_release*.  Key release events are ignored.
     """
 
     def __init__(
@@ -122,11 +125,13 @@ class HotkeyListener:
         hotkey_str: str,
         on_press: Callable[[], None],
         on_release: Callable[[], None],
+        mode: str = "toggle",
     ) -> None:
         self._modifiers, self._trigger = parse_hotkey(hotkey_str)
         self._on_press = on_press
         self._on_release = on_release
         self._hotkey_str = hotkey_str
+        self._mode = mode  # "hold" or "toggle"
 
         # Currently held modifier names (canonical)
         self._held_modifiers: set[str] = set()
@@ -134,11 +139,13 @@ class HotkeyListener:
         self._trigger_held: bool = False
         # Whether the hotkey is currently active (pressed and not yet released)
         self._active: bool = False
+        # Toggle mode: whether recording is currently in progress
+        self._toggled_on: bool = False
 
         self._lock = threading.Lock()
         self._listener: keyboard.Listener | None = None
 
-        logger.debug("HotkeyListener configured for %r", hotkey_str)
+        logger.debug("HotkeyListener configured for %r (mode=%s)", hotkey_str, mode)
 
     # ------------------------------------------------------------------
     # Public API
@@ -168,6 +175,7 @@ class HotkeyListener:
             self._held_modifiers.clear()
             self._trigger_held = False
             self._active = False
+            self._toggled_on = False
 
     # ------------------------------------------------------------------
     # Internal key handlers
@@ -190,6 +198,9 @@ class HotkeyListener:
         return False
 
     def _on_key_press(self, key: keyboard.Key | keyboard.KeyCode) -> None:
+        fire_press = False
+        fire_release = False
+
         with self._lock:
             mod = self._normalize_modifier(key)
             if mod is not None:
@@ -198,41 +209,76 @@ class HotkeyListener:
             if self._is_trigger(key):
                 self._trigger_held = True
 
-            # Check activation: all required modifiers held + trigger held
-            if (
-                not self._active
-                and self._trigger_held
+            # Check if the full hotkey combo is pressed.
+            combo_pressed = (
+                self._trigger_held
                 and self._modifiers <= self._held_modifiers
-            ):
-                self._active = True
-                logger.debug("Hotkey activated: %s", self._hotkey_str)
-                try:
-                    self._on_press()
-                except Exception:
-                    logger.exception("Error in on_press callback")
+            )
+
+            if self._mode == "toggle":
+                # Toggle mode: first press → on_press, second press → on_release.
+                # We only act on the initial combo press (not auto-repeat).
+                if combo_pressed and not self._active:
+                    self._active = True  # track physical key state
+                    if not self._toggled_on:
+                        self._toggled_on = True
+                        fire_press = True
+                    else:
+                        self._toggled_on = False
+                        fire_release = True
+            else:
+                # Hold mode: press → on_press (release handled in _on_key_release).
+                if combo_pressed and not self._active:
+                    self._active = True
+                    fire_press = True
+
+        # Fire callbacks outside the lock to avoid deadlocks.
+        if fire_press:
+            logger.debug("Hotkey activated: %s", self._hotkey_str)
+            try:
+                self._on_press()
+            except Exception:
+                logger.exception("Error in on_press callback")
+
+        if fire_release:
+            logger.debug("Hotkey toggled off: %s", self._hotkey_str)
+            try:
+                self._on_release()
+            except Exception:
+                logger.exception("Error in on_release callback")
 
     def _on_key_release(self, key: keyboard.Key | keyboard.KeyCode) -> None:
+        fire_release = False
+
         with self._lock:
-            should_deactivate = False
-
-            if self._active:
-                # Deactivate if the trigger or any required modifier is released
+            if self._mode == "toggle":
+                # Toggle mode: key release never fires on_release — only
+                # reset the physical key tracking so the next press is detected.
                 mod = self._normalize_modifier(key)
-                if self._is_trigger(key) or (mod is not None and mod in self._modifiers):
-                    should_deactivate = True
+                if self._is_trigger(key):
                     self._active = False
-                    logger.debug("Hotkey deactivated: %s", self._hotkey_str)
+                    self._trigger_held = False
+                if mod is not None:
+                    self._held_modifiers.discard(mod)
+            else:
+                # Hold mode: release fires on_release if active.
+                if self._active:
+                    mod = self._normalize_modifier(key)
+                    if self._is_trigger(key) or (mod is not None and mod in self._modifiers):
+                        fire_release = True
+                        self._active = False
+                        logger.debug("Hotkey deactivated: %s", self._hotkey_str)
 
-            # Update tracking state *after* deactivation check
-            mod = self._normalize_modifier(key)
-            if mod is not None:
-                self._held_modifiers.discard(mod)
+                # Update tracking state *after* deactivation check.
+                mod = self._normalize_modifier(key)
+                if mod is not None:
+                    self._held_modifiers.discard(mod)
 
-            if self._is_trigger(key):
-                self._trigger_held = False
+                if self._is_trigger(key):
+                    self._trigger_held = False
 
-        # Fire callback outside the lock to avoid deadlocks
-        if should_deactivate:
+        # Fire callback outside the lock to avoid deadlocks.
+        if fire_release:
             try:
                 self._on_release()
             except Exception:

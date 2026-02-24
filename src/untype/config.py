@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class HotkeyConfig:
     trigger: str = "f6"
+    mode: str = "toggle"  # "toggle" (press to start/stop) or "hold" (push-to-talk)
 
 
 @dataclass
@@ -123,6 +124,7 @@ class Persona:
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def get_config_path() -> Path:
     """Return the path to the config file (~/.untype/config.toml)."""
     return Path.home() / ".untype" / "config.toml"
@@ -209,8 +211,18 @@ def save_config(config: AppConfig) -> None:
 
 
 def get_personas_dir() -> Path:
-    """Return the path to the personas directory (~/.untype/personas/)."""
-    return Path.home() / ".untype" / "personas"
+    """Return the path to the personas directory.
+
+    In development: ``<project_root>/personas/`` (next to ``src/``).
+    When frozen (PyInstaller): next to the ``.exe``.
+    """
+    import sys
+
+    if getattr(sys, "frozen", False):
+        # PyInstaller: next to the .exe
+        return Path(sys.executable).parent / "personas"
+    # Development: project root (src/untype/config.py → ../../..)
+    return Path(__file__).resolve().parent.parent.parent / "personas"
 
 
 def load_personas() -> list[Persona]:
@@ -269,3 +281,15 @@ def save_persona(persona: Persona) -> None:
     data = asdict(persona)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+def delete_persona(persona_id: str) -> bool:
+    """Delete the persona file for *persona_id*.
+
+    Returns ``True`` if the file existed and was removed.
+    """
+    path = get_personas_dir() / f"{persona_id}.json"
+    if path.exists():
+        path.unlink()
+        return True
+    return False

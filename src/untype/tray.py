@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import threading
 import tkinter as tk
 from tkinter import ttk
@@ -12,7 +11,7 @@ from typing import Callable
 import pystray
 from PIL import Image, ImageDraw
 
-from untype.config import AppConfig, get_personas_dir, save_config
+from untype.config import AppConfig, save_config
 
 logger = logging.getLogger(__name__)
 
@@ -21,11 +20,11 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 _STATUS_COLORS: dict[str, str] = {
-    "Ready": "#4CAF50",          # green
-    "Recording...": "#FF9800",   # orange
-    "Transcribing...": "#2196F3",# blue
+    "Ready": "#4CAF50",  # green
+    "Recording...": "#FF9800",  # orange
+    "Transcribing...": "#2196F3",  # blue
     "Processing...": "#9C27B0",  # purple
-    "Error": "#F44336",          # red
+    "Error": "#F44336",  # red
 }
 
 _DEFAULT_ICON_COLOR = "#4CAF50"
@@ -94,59 +93,114 @@ class SettingsDialog:
         # -- Hotkey -------------------------------------------------------
         row = self._heading(frame, "Hotkey", row)
         hotkey_var = self._text_field(
-            root, frame, "Trigger:", self._config.hotkey.trigger, row,
+            root,
+            frame,
+            "Trigger:",
+            self._config.hotkey.trigger,
+            row,
+        )
+        row += 1
+        hotkey_mode_var = self._combo_field(
+            root,
+            frame,
+            "Mode:",
+            self._config.hotkey.mode,
+            ["toggle", "hold"],
+            row,
         )
         row += 1
 
         # -- LLM ----------------------------------------------------------
         row = self._heading(frame, "LLM", row)
         llm_url_var = self._text_field(
-            root, frame, "Base URL:", self._config.llm.base_url, row,
+            root,
+            frame,
+            "Base URL:",
+            self._config.llm.base_url,
+            row,
         )
         row += 1
         llm_key_var = self._text_field(
-            root, frame, "API Key:", self._config.llm.api_key, row, show="*",
+            root,
+            frame,
+            "API Key:",
+            self._config.llm.api_key,
+            row,
+            show="*",
         )
         row += 1
         llm_model_var = self._text_field(
-            root, frame, "Model:", self._config.llm.model, row,
+            root,
+            frame,
+            "Model:",
+            self._config.llm.model,
+            row,
         )
         row += 1
 
         # -- STT -----------------------------------------------------------
         row = self._heading(frame, "Speech-to-Text", row)
         stt_backend_var = self._combo_field(
-            root, frame, "Backend:", self._config.stt.backend,
-            ["api", "local"], row,
+            root,
+            frame,
+            "Backend:",
+            self._config.stt.backend,
+            ["api", "local"],
+            row,
         )
         row += 1
         stt_api_url_var = self._text_field(
-            root, frame, "STT API URL:", self._config.stt.api_base_url, row,
+            root,
+            frame,
+            "STT API URL:",
+            self._config.stt.api_base_url,
+            row,
         )
         row += 1
         stt_api_key_var = self._text_field(
-            root, frame, "STT API Key:", self._config.stt.api_key, row, show="*",
+            root,
+            frame,
+            "STT API Key:",
+            self._config.stt.api_key,
+            row,
+            show="*",
         )
         row += 1
         stt_api_model_var = self._text_field(
-            root, frame, "STT API Model:", self._config.stt.api_model, row,
+            root,
+            frame,
+            "STT API Model:",
+            self._config.stt.api_model,
+            row,
         )
         row += 1
         stt_model_var = self._combo_field(
-            root, frame, "Local model:", self._config.stt.model_size,
-            ["small", "medium", "large-v3"], row,
+            root,
+            frame,
+            "Local model:",
+            self._config.stt.model_size,
+            ["small", "medium", "large-v3"],
+            row,
         )
         row += 1
         stt_device_var = self._combo_field(
-            root, frame, "Local device:", self._config.stt.device,
-            ["auto", "cuda", "cpu"], row,
+            root,
+            frame,
+            "Local device:",
+            self._config.stt.device,
+            ["auto", "cuda", "cpu"],
+            row,
         )
         row += 1
 
         # -- Audio ---------------------------------------------------------
         row = self._heading(frame, "Audio", row)
         gain_var = self._number_field(
-            root, frame, "Gain boost:", self._config.audio.gain_boost, row,
+            root,
+            frame,
+            "Gain boost:",
+            self._config.audio.gain_boost,
+            row,
         )
         row += 1
 
@@ -155,7 +209,8 @@ class SettingsDialog:
         btn_frame.grid(row=row, column=0, columnspan=2, pady=(16, 0), sticky="e")
 
         ttk.Button(btn_frame, text="Cancel", command=root.destroy).pack(
-            side="right", padx=(8, 0),
+            side="right",
+            padx=(8, 0),
         )
         ttk.Button(
             btn_frame,
@@ -163,6 +218,7 @@ class SettingsDialog:
             command=lambda: self._do_save(
                 root,
                 hotkey_var=hotkey_var,
+                hotkey_mode_var=hotkey_mode_var,
                 llm_url_var=llm_url_var,
                 llm_key_var=llm_key_var,
                 llm_model_var=llm_model_var,
@@ -243,7 +299,10 @@ class SettingsDialog:
         ttk.Label(parent, text=label).grid(row=row, column=0, sticky="w", padx=(0, 8), pady=2)
         var = tk.DoubleVar(master=master, value=value)
         ttk.Entry(parent, textvariable=var, width=48).grid(
-            row=row, column=1, sticky="ew", pady=2,
+            row=row,
+            column=1,
+            sticky="ew",
+            pady=2,
         )
         return var
 
@@ -254,6 +313,7 @@ class SettingsDialog:
         root: tk.Tk,
         *,
         hotkey_var: tk.StringVar,
+        hotkey_mode_var: tk.StringVar,
         llm_url_var: tk.StringVar,
         llm_key_var: tk.StringVar,
         llm_model_var: tk.StringVar,
@@ -276,6 +336,7 @@ class SettingsDialog:
 
         # Apply changes to config
         self._config.hotkey.trigger = hotkey_var.get().strip()
+        self._config.hotkey.mode = hotkey_mode_var.get().strip()
         self._config.llm.base_url = llm_url_var.get().strip()
         self._config.llm.api_key = llm_key_var.get().strip()
         self._config.llm.model = llm_model_var.get().strip()
@@ -321,10 +382,12 @@ class TrayApp:
         config: AppConfig,
         on_settings_changed: Callable[[AppConfig], None],
         on_quit: Callable[[], None],
+        on_personas_changed: Callable[[], None] | None = None,
     ) -> None:
         self._config = config
         self._on_settings_changed = on_settings_changed
         self._on_quit = on_quit
+        self._on_personas_changed_cb = on_personas_changed
         self._status: str = "Ready"
         self._icon: pystray.Icon | None = None
 
@@ -406,10 +469,22 @@ class TrayApp:
         thread.start()
 
     def _on_personas_clicked(self, icon: pystray.Icon, item: pystray.MenuItem) -> None:
-        """Open the personas folder in the file explorer."""
-        personas_dir = get_personas_dir()
-        personas_dir.mkdir(parents=True, exist_ok=True)
-        os.startfile(personas_dir)
+        """Open the persona manager dialog on a dedicated thread."""
+        threading.Thread(
+            target=self._show_persona_dialog,
+            name="untype-persona-dialog",
+            daemon=True,
+        ).start()
+
+    def _show_persona_dialog(self) -> None:
+        """Create and show the persona manager dialog (runs on its own thread)."""
+        try:
+            from untype.persona_dialog import PersonaManagerDialog
+
+            dialog = PersonaManagerDialog(on_changed=self._on_personas_changed_cb)
+            dialog.show()
+        except Exception:
+            logger.exception("Failed to open persona manager dialog")
 
     def _show_settings_dialog(self) -> None:
         """Create and show the settings dialog (runs on its own thread)."""

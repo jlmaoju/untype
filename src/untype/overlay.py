@@ -133,6 +133,7 @@ class CapsuleOverlay:
         self._rec_persona_labels: list[tk.Label] = []
         self._rec_persona_on_click: Callable[[int], None] | None = None
         self._rec_persona_bar_w: int = 0  # measured width for right-alignment
+        self._rec_persona_bar_h: int = 0  # measured height for above-capsule placement
 
     # ------------------------------------------------------------------
     # Thread-safe public API (callable from any thread)
@@ -296,18 +297,18 @@ class CapsuleOverlay:
         )
         canvas.pack(fill="both", expand=True)
 
-        # Main capsule body (pill shape, monochrome).
+        # Main capsule body (pill shape, monochrome, stitch-edge dashed border).
         self._capsule_id = _draw_rounded_rect(
             canvas,
-            0, 0, _CAPSULE_W, _CAPSULE_H, _CAPSULE_R,
-            fill="#2a2a2a", outline="#555555", width=1,
+            2, 2, _CAPSULE_W - 2, _CAPSULE_H - 2, _CAPSULE_R - 2,
+            fill="#2a2a2a", outline="#ffffff", width=2, dash=(14, 8),
         )
 
-        # Status text (centred, small white label).
+        # Status text (centred, bold white label).
         self._text_id = canvas.create_text(
             _CAPSULE_W // 2, _CAPSULE_H // 2,
             text="", fill="#e0e0e0",
-            font=("Segoe UI", 10),
+            font=("Segoe UI", 11, "bold"),
             anchor="center",
         )
 
@@ -522,12 +523,12 @@ class CapsuleOverlay:
         cy = self._fly_start_y + (self._fly_end_y - self._fly_start_y) * t
         win.geometry(f"+{int(cx)}+{int(cy)}")
 
-        # Move recording persona bar in sync with the capsule (right-aligned).
+        # Move recording persona bar in sync with the capsule.
+        # Place ABOVE the capsule so it won't be covered by the taskbar.
         if self._rec_persona_window is not None:
             bar_x = int(cx) + _CAPSULE_W - self._rec_persona_bar_w
-            self._rec_persona_window.geometry(
-                f"+{bar_x}+{int(cy) + _CAPSULE_H + 4}"
-            )
+            bar_y = int(cy) - self._rec_persona_bar_h - 4
+            self._rec_persona_window.geometry(f"+{bar_x}+{bar_y}")
 
         # Gentle alpha fade during the second half of the flight.
         if raw_t > 0.5:
@@ -707,7 +708,13 @@ class CapsuleOverlay:
         y: int,
         on_click: Callable[[int], None] | None,
     ) -> None:
-        """Create and show the recording persona bar below the capsule."""
+        """Create and show the recording persona bar below the capsule.
+
+        Layout adapts to persona count:
+        - 1–2: single horizontal row
+        - 3–4: 2×2 grid
+        - 5–9: 3×3 grid
+        """
         root = self._root
         if root is None:
             return
@@ -728,9 +735,20 @@ class CapsuleOverlay:
         frame = tk.Frame(win, bg="#2a2a2a")
         frame.pack(fill="both", expand=True)
 
+        # Determine grid columns based on persona count.
+        n = len(personas)
+        if n <= 2:
+            cols = n  # 1 or 2 columns, single row
+        elif n <= 4:
+            cols = 2  # 2×2 grid
+        else:
+            cols = 3  # 3×3 grid
+
         labels: list[tk.Label] = []
         for idx, (_pid, icon, name) in enumerate(personas):
             digit = idx + 1
+            row_i = idx // cols
+            col_i = idx % cols
             lbl = tk.Label(
                 frame,
                 text=f" {digit} {icon} {name} ",
@@ -741,7 +759,7 @@ class CapsuleOverlay:
                 padx=2,
                 pady=2,
             )
-            lbl.pack(side="left", padx=(0, 4))
+            lbl.grid(row=row_i, column=col_i, padx=(0, 4), pady=(0, 2), sticky="w")
 
             # Click binding.
             if on_click is not None:
@@ -792,7 +810,9 @@ class CapsuleOverlay:
         # extend off-screen when the capsule is near the right margin.
         win.update_idletasks()
         bar_w = win.winfo_reqwidth()
+        bar_h = win.winfo_reqheight()
         self._rec_persona_bar_w = bar_w
+        self._rec_persona_bar_h = bar_h
         capsule_right = capsule_x + _CAPSULE_W
         bar_x = capsule_right - bar_w
 
@@ -825,6 +845,7 @@ class CapsuleOverlay:
             self._rec_persona_labels = []
             self._rec_persona_on_click = None
             self._rec_persona_bar_w = 0
+            self._rec_persona_bar_h = 0
 
     # ------------------------------------------------------------------
     # Staging area (Phase 3)
