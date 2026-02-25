@@ -13,6 +13,7 @@ from untype.audio import AudioRecorder, normalize_audio
 from untype.clipboard import grab_selected_text, inject_text, release_all_modifiers
 from untype.config import AppConfig, Persona, load_config, load_personas, save_config
 from untype.hotkey import HotkeyListener
+from untype.i18n import init_language, set_language
 from untype.llm import LLMClient
 from untype.overlay import CapsuleOverlay
 from untype.platform import (
@@ -39,6 +40,9 @@ class UnTypeApp:
         self._config = load_config()
         # Deep copy so settings-change detection works (the dialog mutates in-place)
         self._prev_config = copy.deepcopy(self._config)
+
+        # Initialize i18n with the configured language
+        init_language(self._config.language)
 
         # -- Persona system -----------------------------------------------
         self._personas: list[Persona] = load_personas()
@@ -113,6 +117,7 @@ class UnTypeApp:
 
         logger.info("Initialising overlay...")
         self._overlay = CapsuleOverlay(
+            capsule_position=self._config.overlay.capsule_position,
             on_hold_inject=self._on_hold_inject,
             on_hold_copy=self._on_hold_copy,
             on_hold_ghost=self._on_hold_ghost,
@@ -981,6 +986,11 @@ class UnTypeApp:
         logger.info("Saving updated configuration...")
         save_config(new_config)
 
+        # --- Language ---
+        if new_config.language != old.language:
+            logger.info("Language changed (%r→%r)", old.language, new_config.language)
+            set_language(new_config.language)
+
         # --- Hotkey ---
         if (
             new_config.hotkey.trigger != old.hotkey.trigger
@@ -1042,6 +1052,15 @@ class UnTypeApp:
             if self._llm is not None:
                 self._llm.close()
             self._llm = self._init_llm_client()
+
+        # --- Overlay capsule position ---
+        if new_config.overlay.capsule_position != old.overlay.capsule_position:
+            logger.info(
+                "Capsule position changed (%r→%r)",
+                old.overlay.capsule_position,
+                new_config.overlay.capsule_position,
+            )
+            self._overlay.set_capsule_position(new_config.overlay.capsule_position)
 
         # --- Personas ---
         self._personas = load_personas()

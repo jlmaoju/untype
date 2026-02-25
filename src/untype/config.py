@@ -24,6 +24,12 @@ class HotkeyConfig:
 
 
 @dataclass
+class OverlayConfig:
+    # Capsule initial position: "caret" (follow cursor), "bottom_center", "bottom_left"
+    capsule_position: str = "caret"
+
+
+@dataclass
 class AudioConfig:
     sample_rate: int = 16000
     gain_boost: float = 3.0
@@ -98,9 +104,11 @@ class LLMConfig:
 @dataclass
 class AppConfig:
     hotkey: HotkeyConfig = field(default_factory=HotkeyConfig)
+    overlay: OverlayConfig = field(default_factory=OverlayConfig)
     audio: AudioConfig = field(default_factory=AudioConfig)
     stt: STTConfig = field(default_factory=STTConfig)
     llm: LLMConfig = field(default_factory=LLMConfig)
+    language: str = "zh"  # UI language code (e.g. "zh", "en")
 
 
 # ---------------------------------------------------------------------------
@@ -150,6 +158,7 @@ def _deep_merge(defaults: dict, overrides: dict) -> dict:
 def _dict_to_config(data: dict) -> AppConfig:
     """Build an AppConfig from a plain dict (e.g. parsed TOML)."""
     hotkey = _merge_into_dataclass(HotkeyConfig, data.get("hotkey", {}))
+    overlay = _merge_into_dataclass(OverlayConfig, data.get("overlay", {}))
     audio = _merge_into_dataclass(AudioConfig, data.get("audio", {}))
     stt = _merge_into_dataclass(STTConfig, data.get("stt", {}))
 
@@ -159,7 +168,7 @@ def _dict_to_config(data: dict) -> AppConfig:
     llm = _merge_into_dataclass(LLMConfig, llm_data)
     llm.prompts = prompts  # type: ignore[attr-defined]
 
-    return AppConfig(hotkey=hotkey, audio=audio, stt=stt, llm=llm)  # type: ignore[arg-type]
+    return AppConfig(hotkey=hotkey, overlay=overlay, audio=audio, stt=stt, llm=llm)  # type: ignore[arg-type]
 
 
 def _config_to_dict(config: AppConfig) -> dict:
@@ -214,13 +223,20 @@ def get_personas_dir() -> Path:
     """Return the path to the personas directory.
 
     In development: ``<project_root>/personas/`` (next to ``src/``).
-    When frozen (PyInstaller): next to the ``.exe``.
+    When frozen (PyInstaller): check two locations:
+        1. Next to the .exe (user-customizable, takes priority)
+        2. Inside _internal/ (bundled defaults)
     """
     import sys
 
     if getattr(sys, "frozen", False):
-        # PyInstaller: next to the .exe
-        return Path(sys.executable).parent / "personas"
+        # PyInstaller: prefer user-customizable location next to .exe
+        exe_dir = Path(sys.executable).parent
+        user_personas = exe_dir / "personas"
+        if user_personas.is_dir():
+            return user_personas
+        # Fall back to bundled location inside _internal/
+        return exe_dir / "_internal" / "personas"
     # Development: project root (src/untype/config.py → ../../..)
     return Path(__file__).resolve().parent.parent.parent / "personas"
 

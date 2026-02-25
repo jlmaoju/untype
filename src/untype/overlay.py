@@ -14,6 +14,7 @@ import threading
 import tkinter as tk
 from typing import Callable
 
+from untype.i18n import t
 from untype.platform import set_window_noactivate
 
 logger = logging.getLogger(__name__)
@@ -84,6 +85,7 @@ class CapsuleOverlay:
 
     def __init__(
         self,
+        capsule_position: str = "caret",
         on_hold_inject: Callable[[], None] | None = None,
         on_hold_copy: Callable[[], None] | None = None,
         on_hold_ghost: Callable[[], None] | None = None,
@@ -92,6 +94,7 @@ class CapsuleOverlay:
         on_ghost_regenerate: Callable[[], None] | None = None,
         on_ghost_use_raw: Callable[[], None] | None = None,
     ) -> None:
+        self._capsule_position = capsule_position  # "caret", "bottom_center", "bottom_left"
         self._on_hold_inject = on_hold_inject
         self._on_hold_copy = on_hold_copy
         self._on_hold_ghost = on_hold_ghost
@@ -189,6 +192,14 @@ class CapsuleOverlay:
     def hide(self) -> None:
         """Hide the capsule."""
         self._queue.put(("HIDE",))
+
+    def set_capsule_position(self, position: str) -> None:
+        """Update the capsule position preference.
+
+        Args:
+            position: One of "caret", "bottom_center", "bottom_left".
+        """
+        self._capsule_position = position
 
     def show_hold_bubble(self, text: str, x: int, y: int) -> None:
         """Show the hold-for-delivery bubble with a text preview."""
@@ -447,6 +458,32 @@ class CapsuleOverlay:
     # Command handlers (overlay thread only)
     # ------------------------------------------------------------------
 
+    def _get_fixed_position(self) -> tuple[int, int] | None:
+        """Calculate fixed capsule position based on config.
+
+        Returns None if position should follow caret.
+        """
+        if self._capsule_position == "caret":
+            return None
+
+        root = self._root
+        if root is None:
+            return None
+
+        screen_w = root.winfo_screenwidth()
+        screen_h = root.winfo_screenheight()
+
+        if self._capsule_position == "bottom_center":
+            px = (screen_w - _CAPSULE_W) // 2
+            py = screen_h - _CAPSULE_H - 80  # Above taskbar
+            return (px, py)
+        elif self._capsule_position == "bottom_left":
+            px = 24
+            py = screen_h - _CAPSULE_H - 80
+            return (px, py)
+
+        return None
+
     def _do_show(self, x: int, y: int, status: str) -> None:
         win = self._capsule_window
         if win is None:
@@ -455,16 +492,21 @@ class CapsuleOverlay:
         self._capsule_at_corner = False
         self._pending_staging = None
 
-        # Position the capsule: slightly above and to the right of the caret.
-        px = x + 12
-        py = y - _CAPSULE_H - 8
+        # Check for fixed position mode
+        fixed_pos = self._get_fixed_position()
+        if fixed_pos is not None:
+            px, py = fixed_pos
+        else:
+            # Position the capsule: slightly above and to the right of the caret.
+            px = x + 12
+            py = y - _CAPSULE_H - 8
 
-        # Keep on-screen.
-        screen_w = win.winfo_screenwidth()
-        if px + _CAPSULE_W > screen_w:
-            px = x - _CAPSULE_W - 12
-        if py < 0:
-            py = y + 24
+            # Keep on-screen.
+            screen_w = win.winfo_screenwidth()
+            if px + _CAPSULE_W > screen_w:
+                px = x - _CAPSULE_W - 12
+            if py < 0:
+                py = y + 24
 
         win.attributes("-alpha", _CAPSULE_ALPHA_MAX)
         win.geometry(f"{_CAPSULE_W}x{_CAPSULE_H}+{px}+{py}")
@@ -480,8 +522,19 @@ class CapsuleOverlay:
 
         self._current_status = status
 
-        # Display label: strip trailing dots for a cleaner look.
-        label = status.rstrip(".")
+        # Translate status for display (strip trailing dots for cleaner look).
+        # Map internal status keys to i18n keys.
+        status_key_map = {
+            "Recording...": "overlay.recording",
+            "Transcribing...": "overlay.transcribing",
+            "Processing...": "overlay.processing",
+            "Ready": "overlay.ready",
+        }
+        i18n_key = status_key_map.get(status, "")
+        if i18n_key:
+            label = t(i18n_key).rstrip(".")
+        else:
+            label = status.rstrip(".")
         canvas.itemconfigure(self._text_id, text=label)
 
         # Show/hide cancel button based on pipeline status.
@@ -553,7 +606,17 @@ class CapsuleOverlay:
     # ------------------------------------------------------------------
 
     def _do_fly_to_corner(self) -> None:
-        """Fly the capsule to the bottom-right corner, keep it breathing."""
+        """Fly the capsule to the bottom-right corner, keep it breathing.
+
+        If capsule_position is fixed (bottom_center/bottom_left), skip the
+        flight and just keep the capsule in place.
+        """
+        # Skip flight animation for fixed positions
+        if self._capsule_position != "caret":
+            # Just mark as "at corner" so hold bubble logic works
+            self._capsule_at_corner = True
+            return
+
         if self._capsule_at_corner or self._flying:
             return  # already there or en route
         self._fly_bubble_text = None
@@ -561,7 +624,19 @@ class CapsuleOverlay:
 
     def _do_fly_to_hold_bubble(self, text: str) -> None:
         """Fly to corner then show bubble, or show bubble immediately
-        if the capsule is already parked at the corner."""
+        if the capsule is already parked at the corner.
+
+        For fixed positions, skip flight and show bubble directly.
+        """
+        # For fixed positions, just show the bubble in place
+        if self._capsule_position != "caret":
+            win = self._capsule_window
+            if win is not None:
+                win.withdraw()
+            self._capsule_at_corner = False
+            self._do_show_hold_bubble(text, 0, 0)
+            return
+
         if self._capsule_at_corner:
             # Already there — transform into bubble directly.
             self._animating = False
@@ -733,11 +808,7 @@ class CapsuleOverlay:
         canvas.coords(preview_id, _BUBBLE_W // 2, 4 + text_y)
 
         # Hint text.
-        hint_str = (
-            "\u5de6\u952e\u63d2\u5165 | "
-            "\u53f3\u952e\u590d\u5236 | "
-            "\u4e2d\u952e\u540e\u6094\u836f"
-        )
+        hint_str = t("overlay.hold.hint")
         canvas.create_text(
             _BUBBLE_W // 2, 4 + text_y + text_h + 4,
             text=hint_str,
@@ -1103,21 +1174,12 @@ class CapsuleOverlay:
         if personas:
             n = min(len(personas), 9)
             if n == 1:
-                shortcut_hint = "Ctrl+1 \u4eba\u683c"
+                shortcut_hint = "Ctrl+1"
             else:
-                shortcut_hint = f"Ctrl+1~{n} \u4eba\u683c"
-            hint_text = (
-                "Enter \u6da6\u8272  \u2502  "
-                f"{shortcut_hint}  \u2502  "
-                "Shift+Enter \u76f4\u63a5\u53d1\u9001  \u2502  "
-                "Esc \u53d6\u6d88"
-            )
+                shortcut_hint = f"Ctrl+1~{n}"
+            hint_text = t("overlay.staging.hint_with_personas", shortcut=shortcut_hint)
         else:
-            hint_text = (
-                "Enter \u6da6\u8272  \u2502  "
-                "Shift+Enter \u76f4\u63a5\u53d1\u9001  \u2502  "
-                "Esc \u53d6\u6d88"
-            )
+            hint_text = t("overlay.staging.hint")
         hint = tk.Label(
             inner,
             text=hint_text,
@@ -1234,7 +1296,7 @@ class CapsuleOverlay:
 
         icon_label = tk.Label(
             frame,
-            text="\u21a9",
+            text=t("ghost.icon"),
             font=("Segoe UI", 13),
             bg="#2a2a2a",
             fg="#888888",
@@ -1251,7 +1313,7 @@ class CapsuleOverlay:
         # Menu buttons.
         btn_use_raw = tk.Label(
             menu_frame,
-            text=" \u539f\u6587\u66ff\u6362 Raw ",
+            text=f" {t('ghost.raw')} ",
             font=("Segoe UI", 9),
             bg="#3a3a3a",
             fg="#c0c0c0",
@@ -1273,7 +1335,7 @@ class CapsuleOverlay:
 
         btn_regen = tk.Label(
             menu_frame,
-            text=" \u91cd\u65b0\u751f\u6210 Redo ",
+            text=f" {t('ghost.redo')} ",
             font=("Segoe UI", 9),
             bg="#3a3a3a",
             fg="#c0c0c0",
@@ -1295,7 +1357,7 @@ class CapsuleOverlay:
 
         btn_revert = tk.Label(
             menu_frame,
-            text=" \u64a4\u56de\u7f16\u8f91 Edit ",
+            text=f" {t('ghost.edit')} ",
             font=("Segoe UI", 9),
             bg="#3a3a3a",
             fg="#c0c0c0",
@@ -1317,7 +1379,7 @@ class CapsuleOverlay:
 
         btn_dismiss = tk.Label(
             menu_frame,
-            text=" \u00d7 \u5173\u95ed ",
+            text=f" × {t('ghost.close')} ",
             font=("Segoe UI", 9),
             bg="#3a3a3a",
             fg="#c0c0c0",

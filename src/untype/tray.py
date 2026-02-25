@@ -12,6 +12,7 @@ import pystray
 from PIL import Image, ImageDraw
 
 from untype.config import AppConfig, save_config
+from untype.i18n import get_locale_display_name, list_available_locales, t
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,15 @@ _STATUS_COLORS: dict[str, str] = {
     "Transcribing...": "#2196F3",  # blue
     "Processing...": "#9C27B0",  # purple
     "Error": "#F44336",  # red
+}
+
+# Translation keys for status text
+_STATUS_KEYS: dict[str, str] = {
+    "Ready": "tray.status.ready",
+    "Recording...": "tray.status.recording",
+    "Transcribing...": "tray.status.transcribing",
+    "Processing...": "tray.status.processing",
+    "Error": "tray.status.error",
 }
 
 _DEFAULT_ICON_COLOR = "#4CAF50"
@@ -78,7 +88,7 @@ class SettingsDialog:
     def show(self) -> None:
         """Show the settings dialog (blocks until closed)."""
         root = tk.Tk()
-        root.title("UnType — Settings")
+        root.title(t("settings.title"))
         root.resizable(False, False)
         root.attributes("-topmost", True)
 
@@ -91,31 +101,35 @@ class SettingsDialog:
         row = 0
 
         # -- Hotkey -------------------------------------------------------
-        row = self._heading(frame, "Hotkey", row)
+        row = self._heading(frame, t("settings.heading.hotkey"), row)
         hotkey_var = self._text_field(
             root,
             frame,
-            "Trigger:",
+            t("settings.trigger"),
             self._config.hotkey.trigger,
             row,
         )
         row += 1
+        # Mode combo with translated options
+        mode_options = ["toggle", "hold"]
+        mode_labels = [t("settings.mode.toggle"), t("settings.mode.hold")]
         hotkey_mode_var = self._combo_field(
             root,
             frame,
-            "Mode:",
+            t("settings.mode"),
             self._config.hotkey.mode,
-            ["toggle", "hold"],
+            mode_options,
             row,
+            labels=mode_labels,
         )
         row += 1
 
         # -- LLM ----------------------------------------------------------
-        row = self._heading(frame, "LLM", row)
+        row = self._heading(frame, t("settings.heading.llm"), row)
         llm_url_var = self._text_field(
             root,
             frame,
-            "Base URL:",
+            t("settings.base_url"),
             self._config.llm.base_url,
             row,
         )
@@ -123,7 +137,7 @@ class SettingsDialog:
         llm_key_var = self._text_field(
             root,
             frame,
-            "API Key:",
+            t("settings.api_key"),
             self._config.llm.api_key,
             row,
             show="*",
@@ -132,27 +146,30 @@ class SettingsDialog:
         llm_model_var = self._text_field(
             root,
             frame,
-            "Model:",
+            t("settings.model"),
             self._config.llm.model,
             row,
         )
         row += 1
 
         # -- STT -----------------------------------------------------------
-        row = self._heading(frame, "Speech-to-Text", row)
+        row = self._heading(frame, t("settings.heading.stt"), row)
+        stt_backend_options = ["api", "local"]
+        stt_backend_labels = [t("settings.backend.api"), t("settings.backend.local")]
         stt_backend_var = self._combo_field(
             root,
             frame,
-            "Backend:",
+            t("settings.backend"),
             self._config.stt.backend,
-            ["api", "local"],
+            stt_backend_options,
             row,
+            labels=stt_backend_labels,
         )
         row += 1
         stt_api_url_var = self._text_field(
             root,
             frame,
-            "STT API URL:",
+            t("settings.stt_api_url"),
             self._config.stt.api_base_url,
             row,
         )
@@ -160,7 +177,7 @@ class SettingsDialog:
         stt_api_key_var = self._text_field(
             root,
             frame,
-            "STT API Key:",
+            t("settings.stt_api_key"),
             self._config.stt.api_key,
             row,
             show="*",
@@ -169,7 +186,7 @@ class SettingsDialog:
         stt_api_model_var = self._text_field(
             root,
             frame,
-            "STT API Model:",
+            t("settings.stt_api_model"),
             self._config.stt.api_model,
             row,
         )
@@ -177,7 +194,7 @@ class SettingsDialog:
         stt_model_var = self._combo_field(
             root,
             frame,
-            "Local model:",
+            t("settings.local_model"),
             self._config.stt.model_size,
             ["small", "medium", "large-v3"],
             row,
@@ -186,7 +203,7 @@ class SettingsDialog:
         stt_device_var = self._combo_field(
             root,
             frame,
-            "Local device:",
+            t("settings.local_device"),
             self._config.stt.device,
             ["auto", "cuda", "cpu"],
             row,
@@ -194,13 +211,46 @@ class SettingsDialog:
         row += 1
 
         # -- Audio ---------------------------------------------------------
-        row = self._heading(frame, "Audio", row)
+        row = self._heading(frame, t("settings.heading.audio"), row)
         gain_var = self._number_field(
             root,
             frame,
-            "Gain boost:",
+            t("settings.gain_boost"),
             self._config.audio.gain_boost,
             row,
+        )
+        row += 1
+
+        # -- Overlay -------------------------------------------------------
+        row = self._heading(frame, t("settings.heading.overlay"), row)
+        capsule_pos_options = ["caret", "bottom_center", "bottom_left"]
+        capsule_pos_labels = [
+            t("settings.capsule_position.caret"),
+            t("settings.capsule_position.bottom_center"),
+            t("settings.capsule_position.bottom_left"),
+        ]
+        capsule_pos_var = self._combo_field(
+            root,
+            frame,
+            t("settings.capsule_position"),
+            self._config.overlay.capsule_position,
+            capsule_pos_options,
+            row,
+            labels=capsule_pos_labels,
+        )
+        row += 1
+
+        # -- Language ------------------------------------------------------
+        row = self._heading(frame, t("settings.heading.language"), row)
+        available_langs = list_available_locales() or ["zh"]
+        lang_var = self._combo_field(
+            root,
+            frame,
+            t("settings.language"),
+            self._config.language,
+            available_langs,
+            row,
+            labels=[get_locale_display_name(lang) for lang in available_langs],
         )
         row += 1
 
@@ -208,13 +258,13 @@ class SettingsDialog:
         btn_frame = ttk.Frame(frame)
         btn_frame.grid(row=row, column=0, columnspan=2, pady=(16, 0), sticky="e")
 
-        ttk.Button(btn_frame, text="Cancel", command=root.destroy).pack(
+        ttk.Button(btn_frame, text=t("settings.cancel"), command=root.destroy).pack(
             side="right",
             padx=(8, 0),
         )
         ttk.Button(
             btn_frame,
-            text="Save",
+            text=t("settings.save"),
             command=lambda: self._do_save(
                 root,
                 hotkey_var=hotkey_var,
@@ -229,6 +279,8 @@ class SettingsDialog:
                 stt_model_var=stt_model_var,
                 stt_device_var=stt_device_var,
                 gain_var=gain_var,
+                capsule_pos_var=capsule_pos_var,
+                lang_var=lang_var,
             ),
         ).pack(side="right")
 
@@ -279,12 +331,54 @@ class SettingsDialog:
         value: str,
         options: list[str],
         row: int,
+        labels: list[str] | None = None,
     ) -> tk.StringVar:
-        """Add a labelled dropdown and return the associated StringVar."""
+        """Add a labelled dropdown and return the associated StringVar.
+
+        Args:
+            master: The Tk root.
+            parent: Parent frame.
+            label: Label text.
+            value: Current value (should be one of ``options``).
+            options: Internal option values.
+            row: Grid row.
+            labels: Optional display labels for options (same order as ``options``).
+                    If provided, the dropdown shows labels but stores the option value.
+        """
         ttk.Label(parent, text=label).grid(row=row, column=0, sticky="w", padx=(0, 8), pady=2)
         var = tk.StringVar(master=master, value=value)
-        combo = ttk.Combobox(parent, textvariable=var, values=options, width=45, state="readonly")
-        combo.grid(row=row, column=1, sticky="ew", pady=2)
+
+        if labels is not None:
+            # Use labels for display, but we need to handle mapping
+            # Create a custom combobox that shows labels but stores values
+            # Build a mapping from label to value
+            label_to_value = dict(zip(labels, options))
+            value_to_label = dict(zip(options, labels))
+
+            # Set the display label as current value
+            display_var = tk.StringVar(master=master, value=value_to_label.get(value, value))
+
+            combo = ttk.Combobox(
+                parent,
+                textvariable=display_var,
+                values=labels,
+                width=45,
+                state="readonly",
+            )
+            combo.grid(row=row, column=1, sticky="ew", pady=2)
+
+            # When selection changes, update the internal var
+            def _on_select(_event: tk.Event) -> None:  # type: ignore[type-arg]
+                selected_label = display_var.get()
+                var.set(label_to_value.get(selected_label, selected_label))
+
+            combo.bind("<<ComboboxSelected>>", _on_select)
+        else:
+            combo = ttk.Combobox(
+                parent, textvariable=var, values=options, width=45, state="readonly"
+            )
+            combo.grid(row=row, column=1, sticky="ew", pady=2)
+
         return var
 
     @staticmethod
@@ -324,6 +418,8 @@ class SettingsDialog:
         stt_model_var: tk.StringVar,
         stt_device_var: tk.StringVar,
         gain_var: tk.DoubleVar,
+        capsule_pos_var: tk.StringVar,
+        lang_var: tk.StringVar,
     ) -> None:
         """Collect values from the dialog, persist, and notify the app."""
         import tkinter.messagebox as messagebox
@@ -331,7 +427,7 @@ class SettingsDialog:
         try:
             gain_value = gain_var.get()
         except Exception:
-            messagebox.showerror("Invalid value", "Audio gain boost must be a number.")
+            messagebox.showerror(t("settings.error.invalid_gain"), t("settings.error.invalid_gain"))
             return
 
         # Apply changes to config
@@ -347,13 +443,15 @@ class SettingsDialog:
         self._config.stt.model_size = stt_model_var.get().strip()
         self._config.stt.device = stt_device_var.get().strip()
         self._config.audio.gain_boost = gain_value
+        self._config.overlay.capsule_position = capsule_pos_var.get().strip()
+        self._config.language = lang_var.get().strip()
 
         try:
             save_config(self._config)
             logger.info("Configuration saved")
         except Exception:
             logger.exception("Failed to save configuration")
-            messagebox.showerror("Error", "Failed to save configuration file.")
+            messagebox.showerror("Error", t("settings.error.save_failed"))
             return
 
         root.destroy()
@@ -415,7 +513,12 @@ class TrayApp:
 
         color = _STATUS_COLORS.get(status, _DEFAULT_ICON_COLOR)
         icon.icon = _create_icon_image(color)
-        icon.title = f"UnType - {status}"
+
+        # Translate status for display
+        status_key = _STATUS_KEYS.get(status, "tray.status.ready")
+        translated_status = t(status_key)
+        icon.title = f"{t('app.name')} - {translated_status}"
+
         # Rebuild the menu so the status line reflects the new state.
         icon.menu = self._build_menu()
         icon.update_menu()
@@ -434,23 +537,26 @@ class TrayApp:
 
     def _build_menu(self) -> pystray.Menu:
         """Build the right-click context menu."""
+        # Translate status text
+        status_key = _STATUS_KEYS.get(self._status, "tray.status.ready")
+        translated_status = t(status_key)
         return pystray.Menu(
             pystray.MenuItem(
-                f"UnType - {self._status}",
+                f"{t('app.name')} - {translated_status}",
                 action=None,
                 enabled=False,
             ),
             pystray.MenuItem(
-                "Settings...",
+                t("tray.settings"),
                 self._on_settings_clicked,
             ),
             pystray.MenuItem(
-                "Personas...",
+                t("tray.personas"),
                 self._on_personas_clicked,
             ),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(
-                "Quit",
+                t("tray.quit"),
                 self._on_quit_clicked,
             ),
         )

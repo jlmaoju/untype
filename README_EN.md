@@ -1,6 +1,7 @@
 # UnType (忘言)
 
-> 得意忘言 — Speak your mind, forget about typing.
+> The fish trap exists because of the fish; once you've gotten the fish, you can forget the trap. The rabbit snare exists because of the rabbit; once you've gotten the rabbit, you can forget the snare. Words exist because of meaning; once you've gotten the meaning, you can forget the words.
+> — *Zhuangzi, "External Things"*
 
 [中文](README.md)
 
@@ -20,15 +21,17 @@ Most voice input tools give you raw transcription — full of filler words, brok
 
 - **AI-refined output** — Not raw transcription. LLM automatically fixes punctuation, filler words, grammar, and recognition errors before text reaches your cursor.
 - **Voice-edit selected text** — Select text, speak an instruction, and the LLM applies it. Like a voice-controlled find-and-replace on steroids.
-- **Push-to-Talk** — Hold a hotkey (default: F6) to record, release to process. Works in any application.
+- **Push-to-Talk** — Press the hotkey (default: F6) once to start recording, press again to stop. Hold mode also available. Works in any application.
 - **Dual STT backends** — Online API (OpenAI-compatible) or local inference via [faster-whisper](https://github.com/SYSTRAN/faster-whisper). Your choice.
 - **System tray UI** — Color-coded status indicator + settings dialog.
 - **Persona Masks** — Pre-select an LLM personality during recording with a single digit key (1-9) or a click. Define custom tone profiles for different contexts: academic, workplace, casual, bullet-point notes — each with its own prompt, model, and temperature. Drop a JSON file into `personas/` to add a new persona. When a persona is pre-selected, the staging area is skipped for a faster workflow.
+- **Ghost Menu** — Post-injection undo menu: revert to raw draft, regenerate, or reopen editor. No countdown pressure.
+- **Adjustable capsule position** — Choose whether the capsule follows the cursor, stays at bottom center, or bottom left of the screen.
 
 ## How It Works
 
 ```
-Hold hotkey → Speak → Release hotkey
+Press hotkey once → Speak → Press hotkey again to stop
                 ↓
    (During recording: persona bar visible,
     press 1-9 to pre-select a persona)
@@ -41,6 +44,8 @@ Hold hotkey → Speak → Release hotkey
 [ LLM: with persona ]   [ Staging area: edit ]
    ↓                            ↓
 Text appears at cursor ✓  [ LLM → cursor ✓ ]
+                ↓
+       (Ghost menu appears)
 ```
 
 **Two modes, auto-detected:**
@@ -60,7 +65,7 @@ uv run untype
 ```
 
 1. A green circle appears in the system tray. Right-click → **Settings** → fill in your API keys.
-2. Click in any text field, hold **F6**, speak, release **F6**.
+2. Click in any text field, press **F6** once to start recording, speak, press **F6** again to stop.
 3. Polished text appears at your cursor.
 
 ## Requirements
@@ -79,6 +84,8 @@ Settings are stored in `~/.untype/config.toml` (created on first launch):
 | Section | Key | Default | Description |
 |---------|-----|---------|-------------|
 | `hotkey` | `trigger` | `f6` | Push-to-talk hotkey |
+| `hotkey` | `mode` | `toggle` | `toggle` (press to start/stop) or `hold` (hold to speak) |
+| `overlay` | `capsule_position` | `caret` | Capsule position: `caret` (follow cursor), `bottom_center`, or `bottom_left` |
 | `audio` | `gain_boost` | `3.0` | Gain multiplier for quiet speech |
 | `stt` | `backend` | `api` | `api` or `local` |
 | `stt` | `api_base_url` | `""` | OpenAI-compatible STT API endpoint |
@@ -120,7 +127,6 @@ uv run pytest                # Run tests
 
 ## Roadmap
 
-- **Ghost Menu** — Post-injection undo menu: revert to raw draft or regenerate with different wording. No countdown pressure — the undo option stays until you dismiss it.
 - **Distribution** — Standalone `.exe` via PyInstaller/Nuitka. No Python installation required.
 
 ## License
