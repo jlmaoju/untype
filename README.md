@@ -117,8 +117,8 @@ uv run untype
 
 **阿里云实时 API（新增）**
 - 使用阿里云 DashScope 实时语音识别
-- **录音过程中实时显示识别文字**
-- 延迟更低，体验接近微信语音输入
+- **采用 WebSocket 流式传输，录音过程中实时显示识别文字**
+- **延迟极低，体验接近微信语音输入**
 - 需要申请 [阿里云 DashScope API Key](https://dashscope.console.aliyun.com/)
 
 ### 人格面具

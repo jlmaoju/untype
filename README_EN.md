@@ -117,8 +117,8 @@ Settings are stored in `~/.untype/config.toml` (created on first launch):
 
 **Aliyun Realtime API (new)**
 - Uses Aliyun DashScope realtime speech recognition
-- **Shows recognized text during recording**
-- Lower latency, experience similar to WeChat voice input
+- **WebSocket streaming with live transcription preview during recording**
+- **Ultra-low latency, experience similar to WeChat voice input**
 - Requires [Aliyun DashScope API Key](https://dashscope.console.aliyun.com/)
 
 ### Personas
