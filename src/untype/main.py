@@ -1869,8 +1869,97 @@ def _run_first_run_wizard() -> None:
 
     def on_wizard_complete(updated_config: AppConfig) -> None:
         logger.info("Setup wizard completed, configuration updated")
+        _show_tray_notification()
 
     run_setup_wizard(config, on_wizard_complete)
+
+
+def _show_tray_notification() -> None:
+    """Show a bubble notification near the system tray after wizard completion."""
+    try:
+        import tkinter as tk
+        import threading
+
+        def show_notification():
+            # Create a toplevel window for the notification
+            notif = tk.Tk()
+            notif.withdraw()  # Hide from taskbar
+            notif.attributes("-topmost", True)
+            notif.attributes("-toolwindow", True)  # Don't show in taskbar
+            notif.overrideredirect(True)  # Remove window decorations
+
+            # Set background color (dark)
+            bg_color = "#2d2d2d"
+            fg_color = "#e0e0e0"
+            accent_color = "#4CAF50"
+
+            # Notification frame
+            notif_frame = tk.Frame(notif, bg=bg_color, relief="solid", borderwidth=1)
+            notif_frame.pack(padx=15, pady=15)
+
+            # Content
+            content_frame = tk.Frame(notif_frame, bg=bg_color)
+            content_frame.pack()
+
+            # Icon and title row
+            row1 = tk.Frame(content_frame, bg=bg_color)
+            row1.pack(fill="x", pady=(0, 8))
+
+            tk.Label(
+                row1,
+                text="✅",
+                font=("Segoe UI Emoji", 14),
+                bg=bg_color,
+                fg=accent_color,
+            ).pack(side="left", padx=(0, 8))
+
+            tk.Label(
+                row1,
+                text="配置完成！",
+                font=("Microsoft YaHei UI", 11, "bold"),
+                bg=bg_color,
+                fg=fg_color,
+            ).pack(side="left")
+
+            # Message
+            tk.Label(
+                content_frame,
+                text="我在右下角状态栏 👇",
+                font=("Microsoft YaHei UI", 9),
+                bg=bg_color,
+                fg="#b0bec5",
+            ).pack(pady=(0, 5))
+
+            tk.Label(
+                content_frame,
+                text="按 F6 开始使用",
+                font=("Microsoft YaHei UI", 9),
+                bg=bg_color,
+                fg=accent_color,
+            ).pack()
+
+            # Position near bottom right corner
+            screen_width = notif.winfo_screenwidth()
+            screen_height = notif.winfo_screenheight()
+            notif.update_idletasks()
+
+            notif_width = 200
+            notif_height = 100
+
+            x = screen_width - notif_width - 20
+            y = screen_height - notif_height - 60  # Above taskbar
+            notif.geometry(f"+{x}+{y}")
+
+            # Auto-dismiss after 5 seconds
+            notif.after(5000, notif.destroy)
+            notif.mainloop()
+
+        # Run in separate thread to not block main app
+        thread = threading.Thread(target=show_notification, daemon=True)
+        thread.start()
+
+    except Exception as e:
+        logger.warning("Failed to show tray notification: %s", e)
 
 
 def _setup_logging() -> None:

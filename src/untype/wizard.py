@@ -79,11 +79,13 @@ class SetupWizard:
         self._root.mainloop()
 
     def _create_ui(self) -> None:
-        """Create the wizard window."""
+        """Create the wizard window with dark theme."""
         self._root = tk.Tk()
         self._root.title("UnType 设置向导")
         self._root.geometry("680x650")
         self._root.resizable(False, False)
+        # Dark background for window
+        self._root.configure(bg="#1e1e1e")
 
         # Center window
         self._root.update_idletasks()
@@ -93,33 +95,33 @@ class SetupWizard:
         y = (self._root.winfo_screenheight() - h) // 2
         self._root.geometry(f"+{x}+{y}")
 
-        # Main frame with padding
-        main_frame = tk.Frame(self._root, bg="#f5f5f5", padx=20, pady=20)
+        # Main frame with padding - dark theme
+        main_frame = tk.Frame(self._root, bg="#2d2d2d", padx=20, pady=20)
         main_frame.pack(fill="both", expand=True)
 
         # Header frame
-        header_frame = tk.Frame(main_frame, bg="#f5f5f5", height=30)
+        header_frame = tk.Frame(main_frame, bg="#2d2d2d", height=30)
         header_frame.pack(fill="x", pady=(0, 15))
         header_frame.pack_propagate(False)
 
-        # Content frame (scrollable area)
-        self._content_frame = tk.Frame(main_frame, bg="white", relief="solid", borderwidth=1)
+        # Content frame (scrollable area) - dark theme
+        self._content_frame = tk.Frame(main_frame, bg="#252525", relief="solid", borderwidth=1)
         self._content_frame.pack(fill="both", expand=True, pady=(0, 15))
 
-        # Navigation frame with fixed height
-        nav_frame = tk.Frame(main_frame, bg="#f5f5f5", height=50)
+        # Navigation frame with fixed height - dark theme
+        nav_frame = tk.Frame(main_frame, bg="#2d2d2d", height=50)
         nav_frame.pack(fill="x", side="bottom")
         nav_frame.pack_propagate(False)
 
-        # Back button
+        # Back button - dark theme
         self._back_btn = tk.Button(
             nav_frame,
             text="< 上一步",
             font=("Microsoft YaHei UI", 10),
-            bg="#e0e0e0",
-            fg="#333333",
-            activebackground="#d0d0d0",
-            activeforeground="#333333",
+            bg="#3d3d3d",
+            fg="#e0e0e0",
+            activebackground="#4d4d4d",
+            activeforeground="#ffffff",
             relief="flat",
             width=10,
             pady=8,
@@ -127,7 +129,7 @@ class SetupWizard:
         )
         self._back_btn.pack(side="left")
 
-        # Next button
+        # Next button - dark theme
         self._next_btn = tk.Button(
             nav_frame,
             text="下一步 >",
@@ -257,12 +259,12 @@ class SetupWizard:
     # ------------------------------------------------------------------
 
     def _page_welcome(self, parent: tk.Frame) -> None:
-        """Show welcome page (Page 0)."""
-        frame = tk.Frame(parent, bg="white")
+        """Show welcome page (Page 0) - dark theme."""
+        frame = tk.Frame(parent, bg="#252525")
         frame.pack(fill="both", expand=True)
 
         # Main container with padding
-        main_container = tk.Frame(frame, bg="white", padx=40, pady=25)
+        main_container = tk.Frame(frame, bg="#252525", padx=40, pady=25)
         main_container.pack(fill="both", expand=True)
 
         # Title
@@ -270,100 +272,100 @@ class SetupWizard:
             main_container,
             text="🎯 欢迎使用 UnType (忘言)",
             font=("Microsoft YaHei UI", 18, "bold"),
-            bg="white",
-            fg="#333333",
+            bg="#252525",
+            fg="#e0e0e0",
         ).pack(pady=(0, 30))
 
         # Two-column layout for modes
-        modes_frame = tk.Frame(main_container, bg="white")
+        modes_frame = tk.Frame(main_container, bg="#252525")
         modes_frame.pack(fill="x", pady=(0, 25))
 
-        # Left card - Speak to Insert
-        left_card = tk.Frame(modes_frame, bg="#e3f2fd", relief="solid", borderwidth=1)
+        # Left card - Speak to Insert - dark theme with blue accent
+        left_card = tk.Frame(modes_frame, bg="#1a3a5a", relief="solid", borderwidth=1)
         left_card.pack(side="left", fill="both", expand=True, padx=(0, 10), ipadx=20, ipady=20)
 
         tk.Label(
             left_card,
             text="🎤",
             font=("Microsoft YaHei UI", 24),
-            bg="#e3f2fd",
-            fg="#1976D2",
+            bg="#1a3a5a",
+            fg="#64b5f6",
         ).pack(pady=(0, 8))
 
         tk.Label(
             left_card,
             text="说话即输入",
             font=("Microsoft YaHei UI", 13, "bold"),
-            bg="#e3f2fd",
-            fg="#1565C0",
+            bg="#1a3a5a",
+            fg="#90caf9",
         ).pack(pady=(0, 10))
 
         tk.Label(
             left_card,
             text="按下 F6 说话，AI 润色后",
             font=("Microsoft YaHei UI", 10),
-            bg="#e3f2fd",
-            fg="#555",
+            bg="#1a3a5a",
+            fg="#b0bec5",
         ).pack()
 
         tk.Label(
             left_card,
             text="直接输入到光标位置",
             font=("Microsoft YaHei UI", 10),
-            bg="#e3f2fd",
-            fg="#1565C0",
+            bg="#1a3a5a",
+            fg="#64b5f6",
         ).pack(pady=(0, 12))
 
         tk.Label(
             left_card,
             text="💬 适合：快速写作、记笔记、回复消息",
             font=("Microsoft YaHei UI", 9),
-            bg="#e3f2fd",
-            fg="#666",
+            bg="#1a3a5a",
+            fg="#90a4ae",
         ).pack()
 
-        # Right card - Select to Polish
-        right_card = tk.Frame(modes_frame, bg="#fff3e0", relief="solid", borderwidth=1)
+        # Right card - Select to Polish - dark theme with orange accent
+        right_card = tk.Frame(modes_frame, bg="#5a3a1a", relief="solid", borderwidth=1)
         right_card.pack(side="right", fill="both", expand=True, padx=(10, 0), ipadx=20, ipady=20)
 
         tk.Label(
             right_card,
             text="✏️",
             font=("Microsoft YaHei UI", 24),
-            bg="#fff3e0",
-            fg="#F57C00",
+            bg="#5a3a1a",
+            fg="#ff9800",
         ).pack(pady=(0, 8))
 
         tk.Label(
             right_card,
             text="选中即润色",
             font=("Microsoft YaHei UI", 13, "bold"),
-            bg="#fff3e0",
-            fg="#E65100",
+            bg="#5a3a1a",
+            fg="#ffb74d",
         ).pack(pady=(0, 10))
 
         tk.Label(
             right_card,
             text="选中已有文字，说话下令",
             font=("Microsoft YaHei UI", 10),
-            bg="#fff3e0",
-            fg="#555",
+            bg="#5a3a1a",
+            fg="#b0bec5",
         ).pack()
 
         tk.Label(
             right_card,
             text="AI 按你的要求修改",
             font=("Microsoft YaHei UI", 10),
-            bg="#fff3e0",
-            fg="#E65100",
+            bg="#5a3a1a",
+            fg="#ff9800",
         ).pack(pady=(0, 12))
 
         tk.Label(
             right_card,
             text="💡 试试说：「更正式」「翻译」「缩短」",
             font=("Microsoft YaHei UI", 9),
-            bg="#fff3e0",
-            fg="#666",
+            bg="#5a3a1a",
+            fg="#90a4ae",
         ).pack()
 
     def _page_stt_selection(self, parent: tk.Frame) -> None:
