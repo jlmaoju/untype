@@ -51,6 +51,25 @@ Press a digit key (1-9) during recording to switch. Your choice is remembered fo
 
 ## Quick Start
 
+<p align="center">
+  <a href="https://github.com/jlmaoju/UnType/releases">
+    <img src="https://img.shields.io/github/v/release/jlmaoju/UnType?style=for-the-badge&logo=windows&label=Download&color=0066CC" alt="Download">
+  </a>
+</p>
+
+### 📥 Download Pre-built Version (Recommended)
+
+Don't want to install Python? Download the `.exe` from [Releases](https://github.com/jlmaoju/UnType/releases) and double-click to run.
+
+| Version | Size | Description |
+|---------|------|-------------|
+| **Full** | ~275MB | All features, including local Whisper model support |
+| **Online** | ~90MB | API-only mode, smaller size, suitable for users who only need online services |
+
+> 💡 **Note**: The Online version doesn't support local STT models, but all other features are identical. If you don't need offline speech recognition, the Online version is recommended.
+
+### 💻 Build from Source
+
 ```bash
 git clone https://github.com/jlmaoju/UnType.git
 cd untype
