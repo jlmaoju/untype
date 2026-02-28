@@ -85,7 +85,7 @@ class SetupWizard:
         self._root.geometry("680x650")
         self._root.resizable(False, False)
         # Dark background for window
-        self._root.configure(bg="#1e1e1e")
+        self._root.configure(bg="#2d2d2d")
 
         # Center window
         self._root.update_idletasks()
@@ -105,7 +105,7 @@ class SetupWizard:
         header_frame.pack_propagate(False)
 
         # Content frame (scrollable area) - dark theme
-        self._content_frame = tk.Frame(main_frame, bg="#252525", relief="solid", borderwidth=1)
+        self._content_frame = tk.Frame(main_frame, bg="#2d2d2d", relief="solid", borderwidth=1)
         self._content_frame.pack(fill="both", expand=True, pady=(0, 15))
 
         # Navigation frame with fixed height - dark theme
@@ -260,11 +260,11 @@ class SetupWizard:
 
     def _page_welcome(self, parent: tk.Frame) -> None:
         """Show welcome page (Page 0) - dark theme."""
-        frame = tk.Frame(parent, bg="#252525")
+        frame = tk.Frame(parent, bg="#2d2d2d")
         frame.pack(fill="both", expand=True)
 
         # Main container with padding
-        main_container = tk.Frame(frame, bg="#252525", padx=40, pady=25)
+        main_container = tk.Frame(frame, bg="#2d2d2d", padx=40, pady=25)
         main_container.pack(fill="both", expand=True)
 
         # Title
@@ -272,12 +272,12 @@ class SetupWizard:
             main_container,
             text="🎯 欢迎使用 UnType (忘言)",
             font=("Microsoft YaHei UI", 18, "bold"),
-            bg="#252525",
+            bg="#2d2d2d",
             fg="#e0e0e0",
         ).pack(pady=(0, 30))
 
         # Two-column layout for modes
-        modes_frame = tk.Frame(main_container, bg="#252525")
+        modes_frame = tk.Frame(main_container, bg="#2d2d2d")
         modes_frame.pack(fill="x", pady=(0, 25))
 
         # Left card - Speak to Insert - dark theme with blue accent
@@ -370,7 +370,7 @@ class SetupWizard:
 
     def _page_stt_selection(self, parent: tk.Frame) -> None:
         """Show STT mode selection page (Page 1)."""
-        frame = tk.Frame(parent, bg="#252525", padx=40, pady=30)
+        frame = tk.Frame(parent, bg="#2d2d2d", padx=40, pady=30)
         frame.pack(fill="both", expand=True)
 
         # Title
@@ -378,7 +378,7 @@ class SetupWizard:
             frame,
             text="选择语音识别方式",
             font=("Microsoft YaHei UI", 14, "bold"),
-            bg="#252525",
+            bg="#2d2d2d",
             fg="#e0e0e0",
         ).pack(pady=(0, 20))
 
@@ -386,7 +386,7 @@ class SetupWizard:
             frame,
             text="请选择您偏好的语音识别模式：",
             font=("Microsoft YaHei UI", 10),
-            bg="#252525",
+            bg="#2d2d2d",
             fg="#90a4ae",
         ).pack(pady=(0, 20))
 
@@ -427,7 +427,7 @@ class SetupWizard:
         for opt in options:
             card_frame = tk.Frame(
                 frame,
-                bg="#252525",
+                bg="#2d2d2d",
                 relief="solid",
                 borderwidth=1,
                 padx=15,
@@ -441,8 +441,8 @@ class SetupWizard:
                 text="",
                 variable=self._page_vars["stt_backend"],
                 value=opt["value"],
-                bg="#252525",
-                activebackground="white",
+                bg="#2d2d2d",
+                activebackground="#2d2d2d",
                 font=("Arial", 14),
             )
             radio.pack(side="left", padx=(0, 10))
@@ -459,7 +459,7 @@ class SetupWizard:
                 title_row,
                 text=opt["title"],
                 font=("Microsoft YaHei UI", 11, "bold"),
-                bg="#252525",
+                bg="#2d2d2d",
                 fg="#e0e0e0",
             ).pack(side="left")
 
@@ -478,7 +478,7 @@ class SetupWizard:
                 content_frame,
                 text=opt["subtitle"],
                 font=("Microsoft YaHei UI", 9),
-                bg="#252525",
+                bg="#2d2d2d",
                 fg="#888888",
             ).pack(anchor="w")
 
@@ -488,7 +488,7 @@ class SetupWizard:
 
     def _page_stt_config_realtime(self, parent: tk.Frame) -> None:
         """Show realtime API config page (Page 2 - realtime)."""
-        frame = tk.Frame(parent, bg="#252525", padx=40, pady=30)
+        frame = tk.Frame(parent, bg="#2d2d2d", padx=40, pady=30)
         frame.pack(fill="both", expand=True)
 
         # Title
@@ -496,7 +496,7 @@ class SetupWizard:
             frame,
             text="配置阿里云 API",
             font=("Microsoft YaHei UI", 14, "bold"),
-            bg="#252525",
+            bg="#2d2d2d",
             fg="#e0e0e0",
         ).pack(pady=(0, 10))
 
@@ -504,7 +504,7 @@ class SetupWizard:
             frame,
             text="请输入您的阿里云 DashScope API 密钥：",
             font=("Microsoft YaHei UI", 10),
-            bg="#252525",
+            bg="#2d2d2d",
             fg="#90a4ae",
         ).pack(pady=(0, 20))
 
@@ -521,7 +521,7 @@ class SetupWizard:
             input_frame,
             text="API 密钥",
             font=("Microsoft YaHei UI", 10),
-            bg="#252525",
+            bg="#2d2d2d",
             fg="#b0bec5",
         ).pack(anchor="w")
 
@@ -584,21 +584,21 @@ class SetupWizard:
             self._verify_status_frame,
             text="点击「下一步」时将验证密钥",
             font=("Microsoft YaHei UI", 9),
-            bg="#252525",
+            bg="#2d2d2d",
             fg="#888888",
         )
         self._verify_label.pack()
 
     def _page_stt_config_api(self, parent: tk.Frame) -> None:
         """Show online API config page (Page 2 - api)."""
-        frame = tk.Frame(parent, bg="#252525", padx=40, pady=30)
+        frame = tk.Frame(parent, bg="#2d2d2d", padx=40, pady=30)
         frame.pack(fill="both", expand=True)
 
         tk.Label(
             frame,
             text="配置在线 API",
             font=("Microsoft YaHei UI", 14, "bold"),
-            bg="#252525",
+            bg="#2d2d2d",
             fg="#e0e0e0",
         ).pack(pady=(0, 20))
 
@@ -625,7 +625,7 @@ class SetupWizard:
                 field_frame,
                 text=label,
                 font=("Microsoft YaHei UI", 10),
-                bg="#252525",
+                bg="#2d2d2d",
                 fg="#b0bec5",
             ).pack(anchor="w")
 
@@ -644,14 +644,14 @@ class SetupWizard:
 
     def _page_stt_config_local(self, parent: tk.Frame) -> None:
         """Show local model config page (Page 2 - local)."""
-        frame = tk.Frame(parent, bg="#252525", padx=40, pady=30)
+        frame = tk.Frame(parent, bg="#2d2d2d", padx=40, pady=30)
         frame.pack(fill="both", expand=True)
 
         tk.Label(
             frame,
             text="下载本地模型",
             font=("Microsoft YaHei UI", 14, "bold"),
-            bg="#252525",
+            bg="#2d2d2d",
             fg="#e0e0e0",
         ).pack(pady=(0, 10))
 
@@ -659,7 +659,7 @@ class SetupWizard:
             frame,
             text="本地模式需要下载 Whisper 模型：",
             font=("Microsoft YaHei UI", 10),
-            bg="#252525",
+            bg="#2d2d2d",
             fg="#90a4ae",
         ).pack(pady=(0, 20))
 
@@ -696,7 +696,7 @@ class SetupWizard:
             frame,
             text="选择模型大小：",
             font=("Microsoft YaHei UI", 10),
-            bg="#252525",
+            bg="#2d2d2d",
             fg="#b0bec5",
         ).pack(anchor="w", pady=(0, 10))
 
@@ -717,7 +717,7 @@ class SetupWizard:
                 text=f"{value:12} - {desc}",
                 variable=self._page_vars["local_model_size"],
                 value=value,
-                bg="#252525",
+                bg="#2d2d2d",
                 font=("Microsoft YaHei UI", 9),
             ).pack(anchor="w")
 
@@ -730,7 +730,7 @@ class SetupWizard:
                 self._download_frame,
                 text="✓ 模型已下载",
                 font=("Microsoft YaHei UI", 10),
-                bg="#252525",
+                bg="#2d2d2d",
                 fg="#4CAF50",
             ).pack()
         else:
@@ -752,7 +752,7 @@ class SetupWizard:
             self._progress_frame,
             text="正在下载...",
             font=("Microsoft YaHei UI", 9),
-            bg="#252525",
+            bg="#2d2d2d",
             fg="#90a4ae",
         )
         self._progress_bar = ttk.Progressbar(
@@ -790,7 +790,7 @@ class SetupWizard:
             frame,
             text="配置验证",
             font=("Microsoft YaHei UI", 14, "bold"),
-            bg="#252525",
+            bg="#2d2d2d",
             fg="#e0e0e0",
         ).pack(pady=(0, 20))
 
@@ -803,14 +803,14 @@ class SetupWizard:
 
     def _page_llm_config(self, parent: tk.Frame) -> None:
         """Show LLM config page (Page 4)."""
-        frame = tk.Frame(parent, bg="#252525", padx=40, pady=30)
+        frame = tk.Frame(parent, bg="#2d2d2d", padx=40, pady=30)
         frame.pack(fill="both", expand=True)
 
         tk.Label(
             frame,
             text="配置文本润色功能",
             font=("Microsoft YaHei UI", 14, "bold"),
-            bg="#252525",
+            bg="#2d2d2d",
             fg="#e0e0e0",
         ).pack(pady=(0, 10))
 
@@ -818,7 +818,7 @@ class SetupWizard:
             frame,
             text="UnType 使用 AI 在转录后润色文本，这是核心功能。",
             font=("Microsoft YaHei UI", 10),
-            bg="#252525",
+            bg="#2d2d2d",
             fg="#90a4ae",
         ).pack(pady=(0, 20))
 
@@ -845,7 +845,7 @@ class SetupWizard:
                 field_frame,
                 text=label,
                 font=("Microsoft YaHei UI", 10),
-                bg="#252525",
+                bg="#2d2d2d",
                 fg="#b0bec5",
             ).pack(anchor="w")
 
@@ -883,7 +883,7 @@ class SetupWizard:
             frame,
             text="配置验证",
             font=("Microsoft YaHei UI", 14, "bold"),
-            bg="#252525",
+            bg="#2d2d2d",
             fg="#e0e0e0",
         ).pack(pady=(0, 20))
 
@@ -896,14 +896,14 @@ class SetupWizard:
 
     def _page_quick_start(self, parent: tk.Frame) -> None:
         """Show quick start page (Page 5)."""
-        frame = tk.Frame(parent, bg="#252525", padx=40, pady=30)
+        frame = tk.Frame(parent, bg="#2d2d2d", padx=40, pady=30)
         frame.pack(fill="both", expand=True)
 
         tk.Label(
             frame,
             text="🎉 设置完成！",
             font=("Microsoft YaHei UI", 16, "bold"),
-            bg="#252525",
+            bg="#2d2d2d",
             fg="#4CAF50",
         ).pack(pady=(0, 10))
 
@@ -911,19 +911,19 @@ class SetupWizard:
             frame,
             text="现在可以开始使用 UnType 了",
             font=("Microsoft YaHei UI", 11),
-            bg="#252525",
+            bg="#2d2d2d",
             fg="#90a4ae",
         ).pack(pady=(0, 25))
 
         # How to use
-        howto_frame = tk.Frame(frame, bg="#f9f9f9", padx=20, pady=15)
+        howto_frame = tk.Frame(frame, bg="#2d2d2d", padx=20, pady=15)
         howto_frame.pack(fill="x", pady=(0, 20))
 
         tk.Label(
             howto_frame,
             text="如何使用：",
             font=("Microsoft YaHei UI", 11, "bold"),
-            bg="#f9f9f9",
+            bg="#2d2d2d",
             fg="#e0e0e0",
         ).pack(anchor="w")
 
@@ -939,7 +939,7 @@ class SetupWizard:
                 howto_frame,
                 text=step,
                 font=("Microsoft YaHei UI", 9),
-                bg="#f9f9f9",
+                bg="#2d2d2d",
                 fg="#b0bec5",
             ).pack(anchor="w", pady=3)
 
@@ -951,7 +951,7 @@ class SetupWizard:
             tips_frame,
             text="💡 小技巧：",
             font=("Microsoft YaHei UI", 10, "bold"),
-            bg="#252525",
+            bg="#2d2d2d",
             fg="#b0bec5",
         ).pack(anchor="w")
 
@@ -966,7 +966,7 @@ class SetupWizard:
                 tips_frame,
                 text=f"• {tip}",
                 font=("Microsoft YaHei UI", 9),
-                bg="#252525",
+                bg="#2d2d2d",
                 fg="#888888",
             ).pack(anchor="w", pady=2)
 
@@ -1137,7 +1137,7 @@ class SetupWizard:
             self._verify_frame,
             text="正在验证配置...",
             font=("Microsoft YaHei UI", 11),
-            bg="#252525",
+            bg="#2d2d2d",
             fg="#2196F3",
         ).pack(pady=30)
 
@@ -1188,7 +1188,7 @@ class SetupWizard:
                 self._verify_frame,
                 text=message,
                 font=("Microsoft YaHei UI", 11),
-                bg="#252525",
+                bg="#2d2d2d",
                 fg="#4CAF50",
                 justify="left",
             ).pack(pady=20)
@@ -1197,7 +1197,7 @@ class SetupWizard:
                 self._verify_frame,
                 text="配置完成！可以继续下一步了。",
                 font=("Microsoft YaHei UI", 10),
-                bg="#252525",
+                bg="#2d2d2d",
                 fg="#90a4ae",
             ).pack()
 
@@ -1207,7 +1207,7 @@ class SetupWizard:
                 self._verify_frame,
                 text=message,
                 font=("Microsoft YaHei UI", 11),
-                bg="#252525",
+                bg="#2d2d2d",
                 fg="#f44336" if not can_continue else "#FF9800",
                 justify="left",
             ).pack(pady=20)
@@ -1302,7 +1302,7 @@ class SetupWizard:
             self._download_frame,
             text="✓ 模型下载完成",
             font=("Microsoft YaHei UI", 10),
-            bg="#252525",
+            bg="#2d2d2d",
             fg="#4CAF50",
         ).pack()
 
@@ -1319,7 +1319,7 @@ class SetupWizard:
             self._progress_frame,
             text=f"下载失败: {error}",
             font=("Microsoft YaHei UI", 9),
-            bg="#252525",
+            bg="#2d2d2d",
             fg="#f44336",
         ).pack()
 
@@ -1344,7 +1344,7 @@ class SetupWizard:
             self._llm_verify_frame,
             text="正在验证配置...",
             font=("Microsoft YaHei UI", 11),
-            bg="#252525",
+            bg="#2d2d2d",
             fg="#2196F3",
         ).pack(pady=30)
 
@@ -1414,7 +1414,7 @@ class SetupWizard:
                 self._llm_verify_frame,
                 text=message,
                 font=("Microsoft YaHei UI", 11),
-                bg="#252525",
+                bg="#2d2d2d",
                 fg="#4CAF50",
                 justify="left",
             ).pack(pady=20)
@@ -1423,7 +1423,7 @@ class SetupWizard:
                 self._llm_verify_frame,
                 text="配置完成！可以继续下一步了。",
                 font=("Microsoft YaHei UI", 10),
-                bg="#252525",
+                bg="#2d2d2d",
                 fg="#90a4ae",
             ).pack()
 
@@ -1433,7 +1433,7 @@ class SetupWizard:
                 self._llm_verify_frame,
                 text=message,
                 font=("Microsoft YaHei UI", 11),
-                bg="#252525",
+                bg="#2d2d2d",
                 fg="#f44336" if not can_continue else "#FF9800",
                 justify="left",
             ).pack(pady=20)
@@ -1468,14 +1468,14 @@ class SetupWizard:
 
     def _page_persona_selection(self, parent: tk.Frame) -> None:
         """Show persona selection page (Page 5)."""
-        frame = tk.Frame(parent, bg="#252525", padx=40, pady=30)
+        frame = tk.Frame(parent, bg="#2d2d2d", padx=40, pady=30)
         frame.pack(fill="both", expand=True)
 
         tk.Label(
             frame,
             text="选择人格面具",
             font=("Microsoft YaHei UI", 14, "bold"),
-            bg="#252525",
+            bg="#2d2d2d",
             fg="#e0e0e0",
         ).pack(pady=(0, 10))
 
@@ -1483,7 +1483,7 @@ class SetupWizard:
             frame,
             text="选择您想要激活的人格面具（录音时可见）",
             font=("Microsoft YaHei UI", 10),
-            bg="#252525",
+            bg="#2d2d2d",
             fg="#90a4ae",
         ).pack(pady=(0, 20))
 
@@ -1548,8 +1548,8 @@ class SetupWizard:
                 chk = tk.Checkbutton(
                     row,
                     variable=checkbox_var,
-                    bg="#252525",
-                    activebackground="white",
+                    bg="#2d2d2d",
+                    activebackground="#2d2d2d",
                     font=("Microsoft YaHei UI", 10),
                 )
                 chk.pack(side="left", padx=(0, 10))
@@ -1558,7 +1558,7 @@ class SetupWizard:
                     row,
                     text=f"{persona['icon']} {persona['name']}",
                     font=("Microsoft YaHei UI", 10),
-                    bg="#252525",
+                    bg="#2d2d2d",
                     fg="#e0e0e0",
                 ).pack(side="left")
 
@@ -1569,7 +1569,7 @@ class SetupWizard:
                 scrollable_frame,
                 text="暂无可用的人格面具",
                 font=("Microsoft YaHei UI", 10),
-                bg="#252525",
+                bg="#2d2d2d",
                 fg="#888888",
             ).pack(pady=20)
 
