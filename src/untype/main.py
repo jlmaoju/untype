@@ -1879,8 +1879,12 @@ def _show_tray_notification() -> None:
     try:
         import tkinter as tk
         import threading
+        import time
 
         def show_notification():
+            # Wait for wizard to fully close
+            time.sleep(1.0)
+
             # Create a toplevel window for the notification
             notif = tk.Tk()
             notif.withdraw()  # Hide from taskbar
@@ -1955,7 +1959,7 @@ def _show_tray_notification() -> None:
             notif.mainloop()
 
         # Run in separate thread to not block main app
-        thread = threading.Thread(target=show_notification, daemon=True)
+        thread = threading.Thread(target=show_notification, daemon=True, name="tray-notification")
         thread.start()
 
     except Exception as e:

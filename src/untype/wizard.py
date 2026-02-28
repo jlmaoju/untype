@@ -370,7 +370,7 @@ class SetupWizard:
 
     def _page_stt_selection(self, parent: tk.Frame) -> None:
         """Show STT mode selection page (Page 1)."""
-        frame = tk.Frame(parent, bg="white", padx=40, pady=30)
+        frame = tk.Frame(parent, bg="#252525", padx=40, pady=30)
         frame.pack(fill="both", expand=True)
 
         # Title
@@ -378,15 +378,15 @@ class SetupWizard:
             frame,
             text="选择语音识别方式",
             font=("Microsoft YaHei UI", 14, "bold"),
-            bg="white",
-            fg="#333333",
+            bg="#252525",
+            fg="#e0e0e0",
         ).pack(pady=(0, 20))
 
         tk.Label(
             frame,
             text="请选择您偏好的语音识别模式：",
             font=("Microsoft YaHei UI", 10),
-            bg="white",
+            bg="#252525",
             fg="#666666",
         ).pack(pady=(0, 20))
 
@@ -427,7 +427,7 @@ class SetupWizard:
         for opt in options:
             card_frame = tk.Frame(
                 frame,
-                bg="white",
+                bg="#252525",
                 relief="solid",
                 borderwidth=1,
                 padx=15,
@@ -441,26 +441,26 @@ class SetupWizard:
                 text="",
                 variable=self._page_vars["stt_backend"],
                 value=opt["value"],
-                bg="white",
+                bg="#252525",
                 activebackground="white",
                 font=("Arial", 14),
             )
             radio.pack(side="left", padx=(0, 10))
 
             # Content frame
-            content_frame = tk.Frame(card_frame, bg="white")
+            content_frame = tk.Frame(card_frame, bg="#2d2d2d")
             content_frame.pack(side="left", fill="both", expand=True)
 
             # Title row
-            title_row = tk.Frame(content_frame, bg="white")
+            title_row = tk.Frame(content_frame, bg="#2d2d2d")
             title_row.pack(fill="x")
 
             tk.Label(
                 title_row,
                 text=opt["title"],
                 font=("Microsoft YaHei UI", 11, "bold"),
-                bg="white",
-                fg="#333333",
+                bg="#252525",
+                fg="#e0e0e0",
             ).pack(side="left")
 
             if opt["badge"]:
@@ -478,7 +478,7 @@ class SetupWizard:
                 content_frame,
                 text=opt["subtitle"],
                 font=("Microsoft YaHei UI", 9),
-                bg="white",
+                bg="#252525",
                 fg="#888888",
             ).pack(anchor="w")
 
@@ -488,7 +488,7 @@ class SetupWizard:
 
     def _page_stt_config_realtime(self, parent: tk.Frame) -> None:
         """Show realtime API config page (Page 2 - realtime)."""
-        frame = tk.Frame(parent, bg="white", padx=40, pady=30)
+        frame = tk.Frame(parent, bg="#252525", padx=40, pady=30)
         frame.pack(fill="both", expand=True)
 
         # Title
@@ -496,15 +496,15 @@ class SetupWizard:
             frame,
             text="配置阿里云 API",
             font=("Microsoft YaHei UI", 14, "bold"),
-            bg="white",
-            fg="#333333",
+            bg="#252525",
+            fg="#e0e0e0",
         ).pack(pady=(0, 10))
 
         tk.Label(
             frame,
             text="请输入您的阿里云 DashScope API 密钥：",
             font=("Microsoft YaHei UI", 10),
-            bg="white",
+            bg="#252525",
             fg="#666666",
         ).pack(pady=(0, 20))
 
@@ -514,14 +514,14 @@ class SetupWizard:
         if "api_verified" not in self._page_vars:
             self._page_vars["api_verified"] = self._create_boolean_var(value=False)
 
-        input_frame = tk.Frame(frame, bg="white")
+        input_frame = tk.Frame(frame, bg="#2d2d2d")
         input_frame.pack(fill="x", pady=(0, 20))
 
         tk.Label(
             input_frame,
             text="API 密钥",
             font=("Microsoft YaHei UI", 10),
-            bg="white",
+            bg="#252525",
             fg="#555555",
         ).pack(anchor="w")
 
@@ -543,7 +543,7 @@ class SetupWizard:
             text="💡 如何获取 API 密钥？",
             font=("Microsoft YaHei UI", 10, "bold"),
             bg="#f0f8ff",
-            fg="#333333",
+            fg="#e0e0e0",
         ).pack(anchor="w")
 
         steps = [
@@ -572,29 +572,29 @@ class SetupWizard:
         ).pack(anchor="w", pady=(8, 0))
 
         # Verify status
-        self._verify_status_frame = tk.Frame(frame, bg="white")
+        self._verify_status_frame = tk.Frame(frame, bg="#2d2d2d")
         self._verify_status_frame.pack(fill="x")
 
         self._verify_label = tk.Label(
             self._verify_status_frame,
             text="点击「下一步」时将验证密钥",
             font=("Microsoft YaHei UI", 9),
-            bg="white",
+            bg="#252525",
             fg="#888888",
         )
         self._verify_label.pack()
 
     def _page_stt_config_api(self, parent: tk.Frame) -> None:
         """Show online API config page (Page 2 - api)."""
-        frame = tk.Frame(parent, bg="white", padx=40, pady=30)
+        frame = tk.Frame(parent, bg="#252525", padx=40, pady=30)
         frame.pack(fill="both", expand=True)
 
         tk.Label(
             frame,
             text="配置在线 API",
             font=("Microsoft YaHei UI", 14, "bold"),
-            bg="white",
-            fg="#333333",
+            bg="#252525",
+            fg="#e0e0e0",
         ).pack(pady=(0, 20))
 
         # Initialize variables
@@ -613,14 +613,14 @@ class SetupWizard:
         ]
 
         for label, var_key, placeholder in fields:
-            field_frame = tk.Frame(frame, bg="white")
+            field_frame = tk.Frame(frame, bg="#2d2d2d")
             field_frame.pack(fill="x", pady=(0, 15))
 
             tk.Label(
                 field_frame,
                 text=label,
                 font=("Microsoft YaHei UI", 10),
-                bg="white",
+                bg="#252525",
                 fg="#555555",
             ).pack(anchor="w")
 
@@ -633,22 +633,22 @@ class SetupWizard:
 
     def _page_stt_config_local(self, parent: tk.Frame) -> None:
         """Show local model config page (Page 2 - local)."""
-        frame = tk.Frame(parent, bg="white", padx=40, pady=30)
+        frame = tk.Frame(parent, bg="#252525", padx=40, pady=30)
         frame.pack(fill="both", expand=True)
 
         tk.Label(
             frame,
             text="下载本地模型",
             font=("Microsoft YaHei UI", 14, "bold"),
-            bg="white",
-            fg="#333333",
+            bg="#252525",
+            fg="#e0e0e0",
         ).pack(pady=(0, 10))
 
         tk.Label(
             frame,
             text="本地模式需要下载 Whisper 模型：",
             font=("Microsoft YaHei UI", 10),
-            bg="white",
+            bg="#252525",
             fg="#666666",
         ).pack(pady=(0, 20))
 
@@ -669,7 +669,7 @@ class SetupWizard:
             text="模型大小：small (推荐)",
             font=("Microsoft YaHei UI", 10, "bold"),
             bg="#f0f0f0",
-            fg="#333333",
+            fg="#e0e0e0",
         ).pack(anchor="w")
 
         tk.Label(
@@ -685,7 +685,7 @@ class SetupWizard:
             frame,
             text="选择模型大小：",
             font=("Microsoft YaHei UI", 10),
-            bg="white",
+            bg="#252525",
             fg="#555555",
         ).pack(anchor="w", pady=(0, 10))
 
@@ -695,23 +695,23 @@ class SetupWizard:
             ("large-v3", "约 3GB"),
         ]
 
-        model_frame = tk.Frame(frame, bg="white")
+        model_frame = tk.Frame(frame, bg="#2d2d2d")
         model_frame.pack(fill="x")
 
         for value, desc in models:
-            row = tk.Frame(model_frame, bg="white")
+            row = tk.Frame(model_frame, bg="#2d2d2d")
             row.pack(fill="x", pady=3)
             tk.Radiobutton(
                 row,
                 text=f"{value:12} - {desc}",
                 variable=self._page_vars["local_model_size"],
                 value=value,
-                bg="white",
+                bg="#252525",
                 font=("Microsoft YaHei UI", 9),
             ).pack(anchor="w")
 
         # Download button / progress
-        self._download_frame = tk.Frame(frame, bg="white")
+        self._download_frame = tk.Frame(frame, bg="#2d2d2d")
         self._download_frame.pack(fill="x", pady=(20, 0))
 
         if self._page_vars["model_downloaded"].get():
@@ -719,7 +719,7 @@ class SetupWizard:
                 self._download_frame,
                 text="✓ 模型已下载",
                 font=("Microsoft YaHei UI", 10),
-                bg="white",
+                bg="#252525",
                 fg="#4CAF50",
             ).pack()
         else:
@@ -736,12 +736,12 @@ class SetupWizard:
             self._download_btn.pack()
 
         # Progress frame (hidden initially)
-        self._progress_frame = tk.Frame(frame, bg="white")
+        self._progress_frame = tk.Frame(frame, bg="#2d2d2d")
         self._progress_label = tk.Label(
             self._progress_frame,
             text="正在下载...",
             font=("Microsoft YaHei UI", 9),
-            bg="white",
+            bg="#252525",
             fg="#666666",
         )
         self._progress_bar = ttk.Progressbar(
@@ -772,19 +772,19 @@ class SetupWizard:
 
     def _page_stt_verify(self, parent: tk.Frame) -> None:
         """Show STT verification page (Page 3)."""
-        frame = tk.Frame(parent, bg="white", padx=40, pady=40)
+        frame = tk.Frame(parent, bg="#2d2d2d", padx=40, pady=40)
         frame.pack(fill="both", expand=True)
 
         tk.Label(
             frame,
             text="配置验证",
             font=("Microsoft YaHei UI", 14, "bold"),
-            bg="white",
-            fg="#333333",
+            bg="#252525",
+            fg="#e0e0e0",
         ).pack(pady=(0, 20))
 
         # Verification will happen when page is shown
-        self._verify_frame = tk.Frame(frame, bg="white")
+        self._verify_frame = tk.Frame(frame, bg="#2d2d2d")
         self._verify_frame.pack(fill="both", expand=True)
 
         # Trigger verification after UI is ready
@@ -792,22 +792,22 @@ class SetupWizard:
 
     def _page_llm_config(self, parent: tk.Frame) -> None:
         """Show LLM config page (Page 4)."""
-        frame = tk.Frame(parent, bg="white", padx=40, pady=30)
+        frame = tk.Frame(parent, bg="#252525", padx=40, pady=30)
         frame.pack(fill="both", expand=True)
 
         tk.Label(
             frame,
             text="配置文本润色功能",
             font=("Microsoft YaHei UI", 14, "bold"),
-            bg="white",
-            fg="#333333",
+            bg="#252525",
+            fg="#e0e0e0",
         ).pack(pady=(0, 10))
 
         tk.Label(
             frame,
             text="UnType 使用 AI 在转录后润色文本，这是核心功能。",
             font=("Microsoft YaHei UI", 10),
-            bg="white",
+            bg="#252525",
             fg="#666666",
         ).pack(pady=(0, 20))
 
@@ -827,14 +827,14 @@ class SetupWizard:
         ]
 
         for label, var_key, placeholder in fields:
-            field_frame = tk.Frame(frame, bg="white")
+            field_frame = tk.Frame(frame, bg="#2d2d2d")
             field_frame.pack(fill="x", pady=(0, 15))
 
             tk.Label(
                 field_frame,
                 text=label,
                 font=("Microsoft YaHei UI", 10),
-                bg="white",
+                bg="#252525",
                 fg="#555555",
             ).pack(anchor="w")
 
@@ -859,19 +859,19 @@ class SetupWizard:
 
     def _page_llm_verify(self, parent: tk.Frame) -> None:
         """Show LLM verification page (Page 5)."""
-        frame = tk.Frame(parent, bg="white", padx=40, pady=40)
+        frame = tk.Frame(parent, bg="#2d2d2d", padx=40, pady=40)
         frame.pack(fill="both", expand=True)
 
         tk.Label(
             frame,
             text="配置验证",
             font=("Microsoft YaHei UI", 14, "bold"),
-            bg="white",
-            fg="#333333",
+            bg="#252525",
+            fg="#e0e0e0",
         ).pack(pady=(0, 20))
 
         # Verification will happen when page is shown
-        self._llm_verify_frame = tk.Frame(frame, bg="white")
+        self._llm_verify_frame = tk.Frame(frame, bg="#2d2d2d")
         self._llm_verify_frame.pack(fill="both", expand=True)
 
         # Trigger verification after UI is ready
@@ -879,14 +879,14 @@ class SetupWizard:
 
     def _page_quick_start(self, parent: tk.Frame) -> None:
         """Show quick start page (Page 5)."""
-        frame = tk.Frame(parent, bg="white", padx=40, pady=30)
+        frame = tk.Frame(parent, bg="#252525", padx=40, pady=30)
         frame.pack(fill="both", expand=True)
 
         tk.Label(
             frame,
             text="🎉 设置完成！",
             font=("Microsoft YaHei UI", 16, "bold"),
-            bg="white",
+            bg="#252525",
             fg="#4CAF50",
         ).pack(pady=(0, 10))
 
@@ -894,7 +894,7 @@ class SetupWizard:
             frame,
             text="现在可以开始使用 UnType 了",
             font=("Microsoft YaHei UI", 11),
-            bg="white",
+            bg="#252525",
             fg="#666666",
         ).pack(pady=(0, 25))
 
@@ -907,7 +907,7 @@ class SetupWizard:
             text="如何使用：",
             font=("Microsoft YaHei UI", 11, "bold"),
             bg="#f9f9f9",
-            fg="#333333",
+            fg="#e0e0e0",
         ).pack(anchor="w")
 
         steps = [
@@ -927,14 +927,14 @@ class SetupWizard:
             ).pack(anchor="w", pady=3)
 
         # Tips
-        tips_frame = tk.Frame(frame, bg="white")
+        tips_frame = tk.Frame(frame, bg="#2d2d2d")
         tips_frame.pack(fill="x", pady=(0, 20))
 
         tk.Label(
             tips_frame,
             text="💡 小技巧：",
             font=("Microsoft YaHei UI", 10, "bold"),
-            bg="white",
+            bg="#252525",
             fg="#555555",
         ).pack(anchor="w")
 
@@ -949,7 +949,7 @@ class SetupWizard:
                 tips_frame,
                 text=f"• {tip}",
                 font=("Microsoft YaHei UI", 9),
-                bg="white",
+                bg="#252525",
                 fg="#888888",
             ).pack(anchor="w", pady=2)
 
@@ -1120,7 +1120,7 @@ class SetupWizard:
             self._verify_frame,
             text="正在验证配置...",
             font=("Microsoft YaHei UI", 11),
-            bg="white",
+            bg="#252525",
             fg="#2196F3",
         ).pack(pady=30)
 
@@ -1171,7 +1171,7 @@ class SetupWizard:
                 self._verify_frame,
                 text=message,
                 font=("Microsoft YaHei UI", 11),
-                bg="white",
+                bg="#252525",
                 fg="#4CAF50",
                 justify="left",
             ).pack(pady=20)
@@ -1180,7 +1180,7 @@ class SetupWizard:
                 self._verify_frame,
                 text="配置完成！可以继续下一步了。",
                 font=("Microsoft YaHei UI", 10),
-                bg="white",
+                bg="#252525",
                 fg="#666666",
             ).pack()
 
@@ -1190,12 +1190,12 @@ class SetupWizard:
                 self._verify_frame,
                 text=message,
                 font=("Microsoft YaHei UI", 11),
-                bg="white",
+                bg="#252525",
                 fg="#f44336" if not can_continue else "#FF9800",
                 justify="left",
             ).pack(pady=20)
 
-            btn_frame = tk.Frame(self._verify_frame, bg="white")
+            btn_frame = tk.Frame(self._verify_frame, bg="#2d2d2d")
             btn_frame.pack(pady=10)
 
             tk.Button(
@@ -1285,7 +1285,7 @@ class SetupWizard:
             self._download_frame,
             text="✓ 模型下载完成",
             font=("Microsoft YaHei UI", 10),
-            bg="white",
+            bg="#252525",
             fg="#4CAF50",
         ).pack()
 
@@ -1302,7 +1302,7 @@ class SetupWizard:
             self._progress_frame,
             text=f"下载失败: {error}",
             font=("Microsoft YaHei UI", 9),
-            bg="white",
+            bg="#252525",
             fg="#f44336",
         ).pack()
 
@@ -1327,7 +1327,7 @@ class SetupWizard:
             self._llm_verify_frame,
             text="正在验证配置...",
             font=("Microsoft YaHei UI", 11),
-            bg="white",
+            bg="#252525",
             fg="#2196F3",
         ).pack(pady=30)
 
@@ -1397,7 +1397,7 @@ class SetupWizard:
                 self._llm_verify_frame,
                 text=message,
                 font=("Microsoft YaHei UI", 11),
-                bg="white",
+                bg="#252525",
                 fg="#4CAF50",
                 justify="left",
             ).pack(pady=20)
@@ -1406,7 +1406,7 @@ class SetupWizard:
                 self._llm_verify_frame,
                 text="配置完成！可以继续下一步了。",
                 font=("Microsoft YaHei UI", 10),
-                bg="white",
+                bg="#252525",
                 fg="#666666",
             ).pack()
 
@@ -1416,12 +1416,12 @@ class SetupWizard:
                 self._llm_verify_frame,
                 text=message,
                 font=("Microsoft YaHei UI", 11),
-                bg="white",
+                bg="#252525",
                 fg="#f44336" if not can_continue else "#FF9800",
                 justify="left",
             ).pack(pady=20)
 
-            btn_frame = tk.Frame(self._llm_verify_frame, bg="white")
+            btn_frame = tk.Frame(self._llm_verify_frame, bg="#2d2d2d")
             btn_frame.pack(pady=10)
 
             tk.Button(
@@ -1451,22 +1451,22 @@ class SetupWizard:
 
     def _page_persona_selection(self, parent: tk.Frame) -> None:
         """Show persona selection page (Page 5)."""
-        frame = tk.Frame(parent, bg="white", padx=40, pady=30)
+        frame = tk.Frame(parent, bg="#252525", padx=40, pady=30)
         frame.pack(fill="both", expand=True)
 
         tk.Label(
             frame,
             text="选择人格面具",
             font=("Microsoft YaHei UI", 14, "bold"),
-            bg="white",
-            fg="#333333",
+            bg="#252525",
+            fg="#e0e0e0",
         ).pack(pady=(0, 10))
 
         tk.Label(
             frame,
             text="选择您想要激活的人格面具（录音时可见）",
             font=("Microsoft YaHei UI", 10),
-            bg="white",
+            bg="#252525",
             fg="#666666",
         ).pack(pady=(0, 20))
 
@@ -1499,13 +1499,13 @@ class SetupWizard:
             self._page_vars["persona_ids"] = []
 
         # Create scrollable frame for personas
-        container = tk.Frame(frame, bg="white")
+        container = tk.Frame(frame, bg="#2d2d2d")
         container.pack(fill="both", expand=True)
 
-        canvas = tk.Canvas(container, bg="white", highlightthickness=0)
+        canvas = tk.Canvas(container, bg="#2d2d2d", highlightthickness=0)
         scrollbar = ttk.Scrollbar(container, orient="vertical", command=canvas.yview)
 
-        scrollable_frame = tk.Frame(canvas, bg="white")
+        scrollable_frame = tk.Frame(canvas, bg="#2d2d2d")
 
         scrollable_frame.bind(
             "<Configure>",
@@ -1521,7 +1521,7 @@ class SetupWizard:
         # Add persona checkboxes
         if personas_list:
             for i, persona in enumerate(personas_list):
-                row = tk.Frame(scrollable_frame, bg="white", padx=10, pady=5)
+                row = tk.Frame(scrollable_frame, bg="#2d2d2d", padx=10, pady=5)
                 row.pack(fill="x")
 
                 checkbox_var = self._create_boolean_var(value=persona["active"])
@@ -1531,7 +1531,7 @@ class SetupWizard:
                 chk = tk.Checkbutton(
                     row,
                     variable=checkbox_var,
-                    bg="white",
+                    bg="#252525",
                     activebackground="white",
                     font=("Microsoft YaHei UI", 10),
                 )
@@ -1541,8 +1541,8 @@ class SetupWizard:
                     row,
                     text=f"{persona['icon']} {persona['name']}",
                     font=("Microsoft YaHei UI", 10),
-                    bg="white",
-                    fg="#333333",
+                    bg="#252525",
+                    fg="#e0e0e0",
                 ).pack(side="left")
 
                 # Mouse wheel binding
@@ -1552,7 +1552,7 @@ class SetupWizard:
                 scrollable_frame,
                 text="暂无可用的人格面具",
                 font=("Microsoft YaHei UI", 10),
-                bg="white",
+                bg="#252525",
                 fg="#888888",
             ).pack(pady=20)
 
@@ -1565,7 +1565,7 @@ class SetupWizard:
             text="💡 提示",
             font=("Microsoft YaHei UI", 10, "bold"),
             bg="#f0f8ff",
-            fg="#333333",
+            fg="#e0e0e0",
         ).pack(anchor="w")
 
         tk.Label(
