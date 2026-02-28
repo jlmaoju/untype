@@ -51,6 +51,7 @@
     "settings.save": "保存",
     "settings.cancel": "取消",
     "settings.open_logs": "打开日志文件夹",
+    "settings.rerun_wizard": "重新运行向导",
     "settings.error.invalid_gain": "音频增益倍数必须是数字。",
     "settings.error.save_failed": "保存配置文件失败。",
 

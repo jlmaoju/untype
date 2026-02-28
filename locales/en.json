@@ -51,6 +51,7 @@
     "settings.save": "Save",
     "settings.cancel": "Cancel",
     "settings.open_logs": "Open Logs Folder",
+    "settings.rerun_wizard": "Rerun Setup Wizard",
     "settings.error.invalid_gain": "Audio gain boost must be a number.",
     "settings.error.save_failed": "Failed to save configuration file.",
 

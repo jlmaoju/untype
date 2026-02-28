@@ -100,15 +100,17 @@ class SettingsDialog:
     thread — **never** from the pystray callback thread directly.
     """
 
-    def __init__(self, config: AppConfig, on_save: Callable[[AppConfig], None]) -> None:
+    def __init__(self, config: AppConfig, on_save: Callable[[AppConfig], None], on_rerun_wizard: Callable[[], None] | None = None) -> None:
         """
         Args:
             config: Current app configuration.
             on_save: Callback invoked when the user clicks *Save*;
                      receives the updated :class:`AppConfig`.
+            on_rerun_wizard: Optional callback to rerun the setup wizard.
         """
         self._config = config
         self._on_save = on_save
+        self._on_rerun_wizard = on_rerun_wizard
 
     # ------------------------------------------------------------------ #
     # Public
@@ -372,6 +374,15 @@ class SettingsDialog:
             text=t("settings.open_logs"),
             command=lambda: self._open_logs_folder(root),
         ).pack(side="right", padx=(8, 0))
+
+        # Rerun wizard button (if callback provided)
+        if self._on_rerun_wizard:
+            ttk.Button(
+                btn_frame,
+                text=t("settings.rerun_wizard"),
+                command=lambda: self._rerun_wizard(root),
+            ).pack(side="right", padx=(8, 0))
+
         ttk.Button(
             btn_frame,
             text=t("settings.save"),
@@ -409,10 +420,9 @@ class SettingsDialog:
     # Internal helpers
     # ------------------------------------------------------------------ #
 
-    @staticmethod
-    def _open_logs_folder(dialog: tk.Tk) -> None:
+    def _open_logs_folder(self, dialog: tk.Tk) -> None:
         """Open the logs folder in file explorer."""
-        log_dir = SettingsDialog._get_log_dir()
+        log_dir = self._get_log_dir()
         try:
             os.makedirs(log_dir, exist_ok=True)
             # Open folder in default file explorer
@@ -426,6 +436,17 @@ class SettingsDialog:
             logger.info("Opened logs folder: %s", log_dir)
         except Exception as e:
             logger.exception("Failed to open logs folder: %s", e)
+
+    def _rerun_wizard(self, dialog: tk.Tk) -> None:
+        """Rerun the setup wizard."""
+        try:
+            # Close the settings dialog first
+            dialog.destroy()
+            # Trigger the wizard rerun callback
+            if self._on_rerun_wizard:
+                self._on_rerun_wizard()
+        except Exception as e:
+            logger.exception("Failed to rerun wizard: %s", e)
 
     @staticmethod
     def _get_log_dir() -> str:
@@ -867,12 +888,14 @@ class TrayApp:
         on_quit: Callable[[], None],
         on_personas_changed: Callable[[], None] | None = None,
         is_recording: Callable[[], bool] | None = None,
+        on_rerun_wizard: Callable[[], None] | None = None,
     ) -> None:
         self._config = config
         self._on_settings_changed = on_settings_changed
         self._on_quit = on_quit
         self._on_personas_changed_cb = on_personas_changed
         self._is_recording = is_recording
+        self._on_rerun_wizard = on_rerun_wizard
         self._status: str = "Ready"
         self._icon: pystray.Icon | None = None
 
@@ -1007,7 +1030,7 @@ class TrayApp:
             return
 
         try:
-            dialog = SettingsDialog(self._config, self._on_settings_saved)
+            dialog = SettingsDialog(self._config, self._on_settings_saved, self._on_rerun_wizard)
             dialog.show()
         except Exception:
             logger.exception("Failed to open settings dialog")

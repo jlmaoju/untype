@@ -567,7 +567,7 @@ class SetupWizard:
 
         tk.Button(
             help_frame,
-            text="打开控制台",
+            text="打开阿里云控制台",
             font=("Microsoft YaHei UI", 9),
             bg="#2196F3",
             fg="white",
@@ -1467,7 +1467,7 @@ class SetupWizard:
             self._page_vars["llm_verified"] = False
 
     def _page_persona_selection(self, parent: tk.Frame) -> None:
-        """Show persona selection page (Page 5)."""
+        """Show persona selection page (Page 6) - 3x3 grid with cards."""
         frame = tk.Frame(parent, bg="#2d2d2d", padx=40, pady=30)
         frame.pack(fill="both", expand=True)
 
@@ -1481,7 +1481,7 @@ class SetupWizard:
 
         tk.Label(
             frame,
-            text="选择您想要激活的人格面具（录音时可见）",
+            text="点击卡片切换激活状态（录音时可见）",
             font=("Microsoft YaHei UI", 10),
             bg="#2d2d2d",
             fg="#90a4ae",
@@ -1500,7 +1500,6 @@ class SetupWizard:
                     with open(path, encoding="utf-8") as f:
                         data = json.load(f)
                     if isinstance(data, dict) and all(k in data for k in ("id", "name", "icon")):
-                        # Default to active for old files without the field
                         personas_list.append({
                             "id": data["id"],
                             "name": data["name"],
@@ -1515,63 +1514,122 @@ class SetupWizard:
             self._page_vars["persona_checkboxes"] = {}
             self._page_vars["persona_ids"] = []
 
-        # Create scrollable frame for personas
-        container = tk.Frame(frame, bg="#2d2d2d")
-        container.pack(fill="both", expand=True)
+        # Create grid container (3x3)
+        grid_frame = tk.Frame(frame, bg="#2d2d2d")
+        grid_frame.pack(fill="both", expand=True)
 
-        canvas = tk.Canvas(container, bg="#2d2d2d", highlightthickness=0)
-        scrollbar = ttk.Scrollbar(container, orient="vertical", command=canvas.yview)
+        # Track active state for visual updates
+        active_states = {}
 
-        scrollable_frame = tk.Frame(canvas, bg="#2d2d2d")
+        def toggle_persona(persona_id, card_frame, check_label):
+            """Toggle persona active state."""
+            current = active_states.get(persona_id, True)
+            new_state = not current
+            active_states[persona_id] = new_state
+            self._page_vars["persona_checkboxes"][persona_id].set(new_state)
 
-        scrollable_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-        )
+            # Update visual
+            if new_state:
+                card_frame.config(bg="#1a3a5a", relief="solid", borderwidth=2)
+                check_label.config(text="✓", fg="#4CAF50")
+            else:
+                card_frame.config(bg="#333333", relief="solid", borderwidth=1)
+                check_label.config(text="", fg="#666666")
 
-        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set)
+        # Add persona cards (max 9 visible, show ellipsis for more)
+        max_visible = 9
+        visible_personas = personas_list[:max_visible]
 
-        canvas.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
+        for i, persona in enumerate(visible_personas):
+            checkbox_var = self._create_boolean_var(value=persona["active"])
+            self._page_vars["persona_checkboxes"][persona["id"]] = checkbox_var
+            self._page_vars["persona_ids"].append(persona["id"])
+            active_states[persona["id"]] = persona["active"]
 
-        # Add persona checkboxes
-        if personas_list:
-            for i, persona in enumerate(personas_list):
-                row = tk.Frame(scrollable_frame, bg="#2d2d2d", padx=10, pady=5)
-                row.pack(fill="x")
+            row = i // 3
+            col = i % 3
 
-                checkbox_var = self._create_boolean_var(value=persona["active"])
-                self._page_vars["persona_checkboxes"][persona["id"]] = checkbox_var
-                self._page_vars["persona_ids"].append(persona["id"])
+            is_active = persona["active"]
+            card_bg = "#1a3a5a" if is_active else "#333333"
+            card_border = 2 if is_active else 1
 
-                chk = tk.Checkbutton(
-                    row,
-                    variable=checkbox_var,
-                    bg="#2d2d2d",
-                    activebackground="#2d2d2d",
-                    font=("Microsoft YaHei UI", 10),
-                )
-                chk.pack(side="left", padx=(0, 10))
+            card_frame = tk.Frame(
+                grid_frame,
+                bg=card_bg,
+                relief="solid",
+                borderwidth=card_border,
+                padx=15,
+                pady=12,
+            )
+            card_frame.grid(row=row, column=col, padx=8, pady=8, sticky="nsew")
 
-                tk.Label(
-                    row,
-                    text=f"{persona['icon']} {persona['name']}",
-                    font=("Microsoft YaHei UI", 10),
-                    bg="#2d2d2d",
-                    fg="#e0e0e0",
-                ).pack(side="left")
+            # Check indicator
+            check_label = tk.Label(
+                card_frame,
+                text="✓" if is_active else "",
+                font=("Microsoft YaHei UI", 12, "bold"),
+                bg=card_bg,
+                fg="#4CAF50" if is_active else "#666666",
+            )
+            check_label.place(relx=1.0, rely=0.0, anchor="ne", x=-5, y=5)
 
-                # Mouse wheel binding
-                canvas.bind_all("<MouseWheel>", lambda e, c=canvas: c.yview_scroll(int(-1*(e.delta/120)), "units"))
-        else:
+            # Icon
             tk.Label(
-                scrollable_frame,
-                text="暂无可用的人格面具",
+                card_frame,
+                text=persona["icon"],
+                font=("Microsoft YaHei UI", 24),
+                bg=card_bg,
+            ).pack(pady=(8, 4))
+
+            # Name
+            tk.Label(
+                card_frame,
+                text=persona["name"],
                 font=("Microsoft YaHei UI", 10),
+                bg=card_bg,
+                fg="#e0e0e0",
+            ).pack()
+
+            # Click handler
+            def make_click(pid=persona["id"], cf=card_frame, cl=check_label):
+                return lambda e: toggle_persona(pid, cf, cl)
+
+            for widget in card_frame.winfo_children():
+                widget.bind("<Button-1>", make_click())
+            card_frame.bind("<Button-1>", make_click())
+
+        # Configure grid weights
+        for r in range(3):
+            grid_frame.grid_rowconfigure(r, weight=1)
+        for c in range(3):
+            grid_frame.grid_columnconfigure(c, weight=1)
+
+        # Show ellipsis if there are more personas
+        if len(personas_list) > max_visible:
+            ellipsis_frame = tk.Frame(
+                grid_frame,
                 bg="#2d2d2d",
-                fg="#888888",
-            ).pack(pady=20)
+                padx=15,
+                pady=12,
+            )
+            ellipsis_frame.grid(row=2, column=2, padx=8, pady=8, sticky="nsew")
+
+            tk.Label(
+                ellipsis_frame,
+                text="⋮",
+                font=("Microsoft YaHei UI", 20),
+                bg="#2d2d2d",
+                fg="#90a4ae",
+            ).pack()
+
+            remaining = len(personas_list) - max_visible
+            tk.Label(
+                ellipsis_frame,
+                text=f"+{remaining} 更多" if remaining > 0 else "更多",
+                font=("Microsoft YaHei UI", 8),
+                bg="#2d2d2d",
+                fg="#90a4ae",
+            ).pack()
 
         # Help text at bottom
         help_frame = tk.Frame(frame, bg="#1e1e1e", padx=15, pady=12)

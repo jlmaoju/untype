@@ -109,6 +109,7 @@ class UnTypeApp:
             on_settings_changed=self._on_settings_changed,
             on_quit=self._on_quit,
             on_personas_changed=self._on_personas_changed,
+            on_rerun_wizard=self._on_rerun_wizard,
         )
 
         # STT configuration self-check (after tray is ready)
@@ -1401,6 +1402,34 @@ class UnTypeApp:
         self._personas = load_personas()
         logger.info("Reloaded %d persona(s) from persona manager", len(self._personas))
 
+    def _on_rerun_wizard(self) -> None:
+        """Handle rerun wizard request from settings dialog."""
+        logger.info("Rerunning setup wizard...")
+        try:
+            # Import wizard module
+            from untype.wizard import run_setup_wizard
+            from untype.config import load_config
+
+            config = load_config()
+
+            def on_wizard_complete(updated_config: AppConfig) -> None:
+                logger.info("Setup wizard completed, configuration updated")
+                # Reload configuration
+                self._config = updated_config
+                self._prev_config = copy.deepcopy(updated_config)
+                # Reinitialize components that depend on config
+                self._hotkey.stop()
+                self._hotkey = HotkeyListener(
+                    self._config.hotkey.trigger, self._config.hotkey.mode, self._on_hotkey_press
+                )
+                self._hotkey.start()
+                logger.info("Hotkey listener restarted")
+
+            # Run wizard (blocking call)
+            run_setup_wizard(config, on_wizard_complete)
+        except Exception as e:
+            logger.exception("Failed to rerun wizard: %s", e)
+
     def _on_capsule_position_changed(self, x: int, y: int) -> None:
         """Handle capsule position change from drag (fixed mode)."""
         self._config.overlay.capsule_fixed_x = x
@@ -1888,6 +1917,7 @@ def _show_tray_notification() -> None:
 
             # Create notification window
             notif = tk.Tk()
+            notif.configure(bg="#2d2d2d")
             notif.withdraw()
             notif.attributes("-topmost", True)
             notif.attributes("-toolwindow", True)
@@ -1897,11 +1927,9 @@ def _show_tray_notification() -> None:
             bg_color = "#2d2d2d"
             fg_color = "#e0e0e0"
             accent_color = "#4CAF50"
-            border_color = "#4CAF50"
 
             # Main frame
-            main = tk.Frame(notif, bg=bg_color, relief="solid", borderwidth=2)
-            main.config(highlightbackground=border_color, highlightcolor=border_color)
+            main = tk.Frame(notif, bg=bg_color, relief="solid", borderwidth=1)
             main.pack(padx=0, pady=0)
 
             # Content
